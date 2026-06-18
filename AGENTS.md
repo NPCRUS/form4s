@@ -36,8 +36,9 @@ form4s/src/
 
 ## Architecture
 
-- **`Form[Out]`** — tagless-final algebra parameterized by output type. Users implement for their rendering target (HTML, etc.).
-- **`FormDecoder[T]`** — typeclass decoded from `zio.http.Form`. Uses Magnolia `AutoDerivation` for case classes. Sealed traits unsupported.
+- **`Form[Out]`** — tagless-final algebra parameterized by output type. Users implement for their rendering target (HTML, etc.). Includes `decodeAndValidate` combining `FormDecoder` + `Validator` into `Either[Map[String, Seq[String]], T]`.
+- **`FormDecoder[T]`** — typeclass decoded from `zio.http.Form`. Uses Magnolia `AutoDerivation` for case classes. Returns `Either[Seq[DecodingError], T]`. Sealed traits unsupported.
+- **`DecodingError(field, message)`** — structured decode error; `field` is populated inside `join` (Magnolia case class derivation).
 - **`Validator[T]`** — simple `validate(in: T): Seq[String]` with combinators (`compose`, `empty`).
 
 ## Conventions
@@ -47,6 +48,8 @@ form4s/src/
 - No comments in code — keep it minimal
 - Validator error messages are in Russian
 - Test framework: utest 0.8.9 (`test` module, sources in `test/src/`)
+- E2E tests use Playwright 1.60.0 (headless Chromium) + zio-http server
+- Playwright browser install: `./mill test.runMain com.microsoft.playwright.CLI install chromium`
 
 ## MCP Servers
 

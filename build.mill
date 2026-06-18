@@ -25,5 +25,8 @@ object form4s extends ScalaModule with PublishModule {
 object test extends ScalaModule with TestModule.Utest {
   def scalaVersion = "3.8.4"
   def moduleDeps = Seq(form4s)
-  def mvnDeps = Seq(mvn"com.lihaoyi::utest:0.8.9")
+  def mvnDeps = Seq(
+    mvn"com.lihaoyi::utest:0.8.9",
+    mvn"com.microsoft.playwright:playwright:1.60.0"
+  )
 }
