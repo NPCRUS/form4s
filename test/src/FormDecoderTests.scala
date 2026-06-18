@@ -3,6 +3,7 @@ package util
 import utest._
 import zio.http.{Form, FormField, MediaType}
 import zio.Chunk
+import java.time.LocalDateTime
 
 object FormDecoderTests extends TestSuite {
   val tests = Tests {
@@ -196,6 +197,100 @@ object FormDecoderTests extends TestSuite {
         Form(FormField.Binary("test", Chunk.empty, MediaType.text.`plain`))
       val decoded = summon[FormDecoder[String]].decode(form)
       assert(decoded.isLeft)
+    }
+
+    test("decode LocalDateTime from valid string") {
+      val form = Form(FormField.Simple("test", "2024-01-15T10:30"))
+      val decoded = summon[FormDecoder[LocalDateTime]].decode(form)
+      assert(decoded == Right(LocalDateTime.of(2024, 1, 15, 10, 30)))
+    }
+
+    test("decode LocalDateTime fallback without minutes") {
+      val form = Form(FormField.Simple("test", "2024-01-15T10"))
+      val decoded = summon[FormDecoder[LocalDateTime]].decode(form)
+      assert(decoded == Right(LocalDateTime.of(2024, 1, 15, 10, 0)))
+    }
+
+    test("decode LocalDateTime throws on invalid string") {
+      val form = Form(FormField.Simple("test", "garbage"))
+      intercept[Exception] {
+        summon[FormDecoder[LocalDateTime]].decode(form)
+      }
+    }
+
+    test("decode Option from empty form returns None") {
+      val decoded = summon[FormDecoder[Option[String]]].decode(Form())
+      assert(decoded == Right(None))
+    }
+
+    test("decode Boolean unrecognized value returns false") {
+      val form = Form(FormField.Simple("test", "maybe"))
+      val decoded = summon[FormDecoder[Boolean]].decode(form)
+      assert(decoded == Right(false))
+    }
+
+    test("decode multi-field case class") {
+      case class User(name: String, age: Int, active: Boolean)
+          derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("age", "30"),
+        FormField.Simple("active", "true")
+      )
+      val decoded = summon[FormDecoder[User]].decode(form)
+      assert(decoded == Right(User("Alice", 30, true)))
+    }
+
+    test("decode case class with Seq field from multiple fields") {
+      case class Tags(tags: Seq[String]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("tags", "a"),
+        FormField.Simple("tags", "b"),
+        FormField.Simple("tags", "c")
+      )
+      val decoded = summon[FormDecoder[Tags]].decode(form)
+      assert(decoded == Right(Tags(Seq("a", "b", "c"))))
+    }
+
+    test(
+      "decode case class with multiple missing required fields reports first error"
+    ) {
+      case class TwoRequired(first: String, second: Int) derives FormDecoder
+      val form = Form()
+      val decoded = summon[FormDecoder[TwoRequired]].decode(form)
+      assert(decoded.isLeft)
+      assert(decoded.left.exists(_.contains("first")))
+    }
+
+    test("decode Option[Int] valid") {
+      val form = Form(FormField.Simple("test", "42"))
+      val decoded = summon[FormDecoder[Option[Int]]].decode(form)
+      assert(decoded == Right(Some(42)))
+    }
+
+    test("decode Option[Int] invalid propagates error") {
+      val form = Form(FormField.Simple("test", "abc"))
+      val decoded = summon[FormDecoder[Option[Int]]].decode(form)
+      assert(decoded.isLeft)
+    }
+
+    test("decode negative and zero Int") {
+      val negForm = Form(FormField.Simple("test", "-5"))
+      assert(summon[FormDecoder[Int]].decode(negForm) == Right(-5))
+      val zeroForm = Form(FormField.Simple("test", "0"))
+      assert(summon[FormDecoder[Int]].decode(zeroForm) == Right(0))
+    }
+
+    test("decode Either[String, String] is left-biased") {
+      val form = Form(FormField.Simple("test", "hello"))
+      val decoded = summon[FormDecoder[Either[String, String]]].decode(form)
+      assert(decoded == Right(Left("hello")))
+    }
+
+    test("decode Seq[Boolean] from comma-separated values") {
+      val form = Form(FormField.Simple("test", "true,false,on"))
+      val decoded = summon[FormDecoder[Seq[Boolean]]].decode(form)
+      assert(decoded == Right(Seq(true, false, true)))
     }
 
   }
