@@ -10,19 +10,21 @@ import zio.http.Charsets
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+case class DecodingError(field: String, message: String)
+
 trait FormDecoder[T] {
-  def decode(input: Form): Either[String, T]
+  def decode(input: Form): Either[Seq[DecodingError], T]
 
   def isOptional: Boolean = false
 }
 object FormDecoder extends AutoDerivation[FormDecoder] {
 
-  def decode[T: FormDecoder](input: Form): Either[String, T] =
+  def decode[T: FormDecoder](input: Form): Either[Seq[DecodingError], T] =
     summon[FormDecoder[T]].decode(input)
 
   def decodeFormData[T: FormDecoder](input: Body): IO[Throwable, T] = {
     input.asMultipartForm
-      .map { form => // convert all string like chunks to string
+      .map { form =>
         val newChunks = form.formData.map {
           case FormField.Binary(name, data, contentType, _, _)
               if contentType.subType == "octet-stream" =>
@@ -33,31 +35,36 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       }
       .flatMap { form =>
         FormDecoder.decode[T](form) match
-          case Left(error)  => ZIO.fail(new Exception(error))
+          case Left(errors) =>
+            ZIO.fail(
+              new Exception(
+                errors.map(e => s"${e.field}: ${e.message}").mkString("; ")
+              )
+            )
           case Right(value) => ZIO.succeed(value)
       }
   }
 
   given stringDecoder: FormDecoder[String] = new FormDecoder[String] {
-    def decode(input: Form): Either[String, String] =
+    def decode(input: Form): Either[Seq[DecodingError], String] =
       input.formData.head.stringValue.toRight(
-        "Cannot convert to String"
+        Seq(DecodingError("", "Cannot convert to String"))
       )
   }
 
   given FormDecoder[Int] = new FormDecoder[Int] {
-    def decode(input: Form): Either[String, Int] =
+    def decode(input: Form): Either[Seq[DecodingError], Int] =
       stringDecoder
         .decode(input)
         .flatMap(v =>
           v.toIntOption.toRight(
-            "Cannot convert to Int"
+            Seq(DecodingError("", "Cannot convert to Int"))
           )
         )
   }
 
   given FormDecoder[Boolean] = new FormDecoder[Boolean] {
-    def decode(input: Form): Either[String, Boolean] =
+    def decode(input: Form): Either[Seq[DecodingError], Boolean] =
       stringDecoder
         .decode(input)
         .flatMap { v =>
@@ -75,7 +82,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
 
   given FormDecoder[LocalDateTime] = new FormDecoder[LocalDateTime] {
-    def decode(input: Form): Either[String, LocalDateTime] =
+    def decode(input: Form): Either[Seq[DecodingError], LocalDateTime] =
       stringDecoder
         .decode(input)
         .flatMap(v =>
@@ -88,7 +95,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
 
   given [T](using decoder: FormDecoder[T]): FormDecoder[Option[T]] =
     new FormDecoder[Option[T]] {
-      def decode(input: Form): Either[String, Option[T]] =
+      def decode(input: Form): Either[Seq[DecodingError], Option[T]] =
         if (input.formData.isEmpty) Right(None)
         else
           input.formData.head match {
@@ -105,7 +112,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
 
   given [T](using decoder: FormDecoder[T]): FormDecoder[Seq[T]] =
     new FormDecoder[Seq[T]] {
-      def decode(input: Form): Either[String, Seq[T]] =
+      def decode(input: Form): Either[Seq[DecodingError], Seq[T]] =
         if (input.formData.isEmpty) Right(Seq.empty)
         else {
           input.formData.head.stringValue match {
@@ -117,10 +124,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
               if (results.forall(_.isRight)) {
                 Right(results.toSeq.flatMap(_.toOption))
               } else {
-                val head = results.collect { case Left(err) =>
-                  err
-                }.head
-                Left(head)
+                Left(results.collect { case Left(errs) => errs }.flatten.toSeq)
               }
             case _ =>
               val result =
@@ -128,9 +132,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
               if (result.forall(_.isRight)) {
                 Right(result.flatMap(_.toOption))
               } else {
-                Left(result.collect { case Left(value) =>
-                  value
-                }.head)
+                Left(result.collect { case Left(errs) => errs }.flatten.toSeq)
               }
           }
         }
@@ -149,28 +151,35 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
 
   override def join[T](caseClass: CaseClass[FormDecoder, T]): FormDecoder[T] =
     new FormDecoder[T] {
-      def decode(input: Form): Either[String, T] = {
+      def decode(input: Form): Either[Seq[DecodingError], T] = {
         val decodedFields = caseClass.parameters.map { param =>
           val fieldName = param.label
           val decoder = param.typeclass
           val fields = input.formData.filter(_.name == fieldName)
 
           if (fields.nonEmpty) {
-            decoder.decode(Form(fields))
+            decoder
+              .decode(Form(fields))
+              .left
+              .map(_.map(_.copy(field = fieldName)))
           } else {
             if (decoder.isOptional) {
-              decoder.decode(Form(FormField.Simple("", "")))
+              decoder
+                .decode(Form(FormField.Simple("", "")))
+                .left
+                .map(_.map(_.copy(field = fieldName)))
             } else {
-              Left("Required field is missing")
+              Left(Seq(DecodingError(fieldName, "Required field is missing")))
             }
           }
         }
 
         decodedFields
-          .foldLeft[Either[String, List[Any]]](Right(Nil)) {
+          .foldLeft[Either[Seq[DecodingError], List[Any]]](Right(Nil)) {
             case (Right(acc), Right(value)) => Right(value :: acc)
-            case (Left(err), _)             => Left(err)
-            case (_, Left(err))             => Left(err)
+            case (Left(errs), Right(_))     => Left(errs)
+            case (Right(_), Left(errs))     => Left(errs)
+            case (Left(errs1), Left(errs2)) => Left(errs1 ++ errs2)
           }
           .map { values =>
             caseClass.rawConstruct(values.reverse)
@@ -182,8 +191,8 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       sealedTrait: SealedTrait[FormDecoder, T]
   ): FormDecoder[T] =
     new FormDecoder[T] {
-      def decode(input: Form): Either[String, T] =
-        Left(s"Cannot decode sealed trait")
+      def decode(input: Form): Either[Seq[DecodingError], T] =
+        Left(Seq(DecodingError("", "Cannot decode sealed trait")))
     }
 
 }
