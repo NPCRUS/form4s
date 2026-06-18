@@ -191,7 +191,7 @@ object FormDecoderTests extends TestSuite {
       val decoded = summon[FormDecoder[Required]].decode(form)
       assert(
         decoded == Left(
-          Seq(DecodingError("value", "Required field is missing"))
+          Seq(DecodingError("value", "Обязательное поле"))
         )
       )
     }
@@ -265,8 +265,8 @@ object FormDecoderTests extends TestSuite {
       assert(
         decoded == Left(
           Seq(
-            DecodingError("first", "Required field is missing"),
-            DecodingError("second", "Required field is missing")
+            DecodingError("first", "Обязательное поле"),
+            DecodingError("second", "Обязательное поле")
           )
         )
       )

@@ -48,7 +48,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
   given stringDecoder: FormDecoder[String] = new FormDecoder[String] {
     def decode(input: Form): Either[Seq[DecodingError], String] =
       input.formData.head.stringValue.toRight(
-        Seq(DecodingError("", "Cannot convert to String"))
+        Seq(DecodingError("", "Невозможно преобразовать в строку"))
       )
   }
 
@@ -58,7 +58,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         .decode(input)
         .flatMap(v =>
           v.toIntOption.toRight(
-            Seq(DecodingError("", "Cannot convert to Int"))
+            Seq(DecodingError("", "Невозможно преобразовать в число"))
           )
         )
   }
@@ -169,7 +169,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
                 .left
                 .map(_.map(_.copy(field = fieldName)))
             } else {
-              Left(Seq(DecodingError(fieldName, "Required field is missing")))
+              Left(Seq(DecodingError(fieldName, "Обязательное поле")))
             }
           }
         }
@@ -192,7 +192,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
   ): FormDecoder[T] =
     new FormDecoder[T] {
       def decode(input: Form): Either[Seq[DecodingError], T] =
-        Left(Seq(DecodingError("", "Cannot decode sealed trait")))
+        Left(Seq(DecodingError("", "Невозможно декодировать sealed trait")))
     }
 
 }

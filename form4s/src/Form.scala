@@ -70,4 +70,19 @@ trait Form[Out] {
       (names(idx), errors)
     }.toMap
   }
+
+  def decodeAndValidate[T[F[_]] <: Product](
+      input: zio.http.Form
+  )(using
+      schema: T[FieldSchema],
+      decoder: util.FormDecoder[T[[T] =>> T]]
+  ): Either[Map[String, Seq[String]], T[[T] =>> T]] =
+    decoder.decode(input) match {
+      case Left(errors) =>
+        Left(errors.groupMap(_.field)(_.message))
+      case Right(decoded) =>
+        val validationErrors = validate(decoded).filter(_._2.nonEmpty)
+        if (validationErrors.nonEmpty) Left(validationErrors)
+        else Right(decoded)
+    }
 }
