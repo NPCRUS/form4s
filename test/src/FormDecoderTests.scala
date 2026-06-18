@@ -189,7 +189,7 @@ object FormDecoderTests extends TestSuite {
       case class Required(value: String) derives FormDecoder
       val form = Form()
       val decoded = summon[FormDecoder[Required]].decode(form)
-      assert(decoded.left.exists(_.contains("No such field value")))
+      assert(decoded.left.exists(_.contains("Required field is missing")))
     }
 
     test("FormDecoder binary field with string decoder fails") {
@@ -258,8 +258,7 @@ object FormDecoderTests extends TestSuite {
       case class TwoRequired(first: String, second: Int) derives FormDecoder
       val form = Form()
       val decoded = summon[FormDecoder[TwoRequired]].decode(form)
-      assert(decoded.isLeft)
-      assert(decoded.left.exists(_.contains("first")))
+      assert(decoded == Left("Required field is missing"))
     }
 
     test("decode Option[Int] valid") {

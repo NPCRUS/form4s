@@ -41,7 +41,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
   given stringDecoder: FormDecoder[String] = new FormDecoder[String] {
     def decode(input: Form): Either[String, String] =
       input.formData.head.stringValue.toRight(
-        s"FormField ${input.formData.head.name} cannot be converted to primitive type(actual: ${input.formData.head.contentType})"
+        "Cannot convert to String"
       )
   }
 
@@ -51,7 +51,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         .decode(input)
         .flatMap(v =>
           v.toIntOption.toRight(
-            s"FormField ${input.formData.head.name} cannot be converted to Int(value: $v)"
+            "Cannot convert to Int"
           )
         )
   }
@@ -161,7 +161,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
             if (decoder.isOptional) {
               decoder.decode(Form(FormField.Simple("", "")))
             } else {
-              Left(s"No such field $fieldName on form")
+              Left("Required field is missing")
             }
           }
         }
