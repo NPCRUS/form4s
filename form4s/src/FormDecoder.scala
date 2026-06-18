@@ -1,15 +1,14 @@
-package form
+package util
 
+import zio.http.Form
 import magnolia1.*
+
 import zio.*
+import zio.http.FormField
 import zio.http.Body
 import zio.http.Charsets
-import zio.http.Form
-import zio.http.FormField
-
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.UUID
 
 trait FormDecoder[T] {
   def decode(input: Form): Either[String, T]
@@ -55,32 +54,6 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
             s"FormField ${input.formData.head.name} cannot be converted to Int(value: $v)"
           )
         )
-  }
-
-  given FormDecoder[Long] = new FormDecoder[Long] {
-    def decode(input: Form): Either[String, Long] =
-      stringDecoder
-        .decode(input)
-        .flatMap(v =>
-          v.toLongOption.toRight(
-            s"FormField ${input.formData.head.name} cannot be converted to Int(value: $v)"
-          )
-        )
-  }
-
-  given FormDecoder[UUID] = new FormDecoder[UUID] {
-    def decode(input: Form): Either[String, UUID] =
-      stringDecoder
-        .decode(input)
-        .flatMap { v =>
-          try Right(UUID.fromString(v))
-          catch {
-            case _: IllegalArgumentException =>
-              Left(
-                s"FormField ${input.formData.head.name} cannot be converted to UUID (value: $v)"
-              )
-          }
-        }
   }
 
   given FormDecoder[Boolean] = new FormDecoder[Boolean] {
@@ -136,13 +109,13 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         if (input.formData.isEmpty) Right(Seq.empty)
         else {
           input.formData.head.stringValue match {
-            case Some("") => Right(Seq.empty)
+            case Some("")                   => Right(Seq.empty)
             case Some(v) if v.contains(",") =>
               val results =
                 v.split(",")
                   .map(str => decoder.decode(Form(FormField.Simple("", str))))
               if (results.forall(_.isRight)) {
-                Right(results.toSeq.map(_.toOption.get))
+                Right(results.toSeq.flatMap(_.toOption))
               } else {
                 val head = results.collect { case Left(err) =>
                   err
@@ -153,7 +126,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
               val result =
                 input.formData.map(field => decoder.decode(Form(field)))
               if (result.forall(_.isRight)) {
-                Right(result.map(_.toOption.get))
+                Right(result.flatMap(_.toOption))
               } else {
                 Left(result.collect { case Left(value) =>
                   value
