@@ -9,6 +9,7 @@ import zio.http.Body
 import zio.http.Charsets
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 case class DecodingError(field: String, message: String)
 
@@ -60,6 +61,29 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
           v.toIntOption.toRight(
             Seq(DecodingError("", "Невозможно преобразовать в число"))
           )
+        )
+  }
+
+  given FormDecoder[Long] = new FormDecoder[Long] {
+    def decode(input: Form): Either[Seq[DecodingError], Long] =
+      stringDecoder
+        .decode(input)
+        .flatMap(v =>
+          v.toLongOption.toRight(
+            Seq(DecodingError("", "Невозможно преобразовать в число"))
+          )
+        )
+  }
+
+  given FormDecoder[UUID] = new FormDecoder[UUID] {
+    def decode(input: Form): Either[Seq[DecodingError], UUID] =
+      stringDecoder
+        .decode(input)
+        .flatMap(v =>
+          try Right(UUID.fromString(v))
+          catch
+            case _: IllegalArgumentException =>
+              Left(Seq(DecodingError("", "Невозможно преобразовать в UUID")))
         )
   }
 

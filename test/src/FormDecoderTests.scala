@@ -4,6 +4,7 @@ import utest._
 import zio.http.{Form, FormField, MediaType}
 import zio.Chunk
 import java.time.LocalDateTime
+import java.util.UUID
 
 object FormDecoderTests extends TestSuite {
   val tests = Tests {
@@ -301,6 +302,44 @@ object FormDecoderTests extends TestSuite {
       val form = Form(FormField.Simple("test", "true,false,on"))
       val decoded = summon[FormDecoder[Seq[Boolean]]].decode(form)
       assert(decoded == Right(Seq(true, false, true)))
+    }
+
+    test("decode Long from simple field") {
+      val form = Form(FormField.Simple("test", "9223372036854775807"))
+      val decoded = summon[FormDecoder[Long]].decode(form)
+      assert(decoded == Right(9223372036854775807L))
+    }
+
+    test("decode Long negative and zero") {
+      val negForm = Form(FormField.Simple("test", "-100"))
+      assert(summon[FormDecoder[Long]].decode(negForm) == Right(-100L))
+      val zeroForm = Form(FormField.Simple("test", "0"))
+      assert(summon[FormDecoder[Long]].decode(zeroForm) == Right(0L))
+    }
+
+    test("decode Long fails on non-numeric string") {
+      val form = Form(FormField.Simple("test", "not-a-number"))
+      val decoded = summon[FormDecoder[Long]].decode(form)
+      assert(decoded.isLeft)
+    }
+
+    test("decode Long fails on overflow") {
+      val form = Form(FormField.Simple("test", "99999999999999999999"))
+      val decoded = summon[FormDecoder[Long]].decode(form)
+      assert(decoded.isLeft)
+    }
+
+    test("decode UUID from valid string") {
+      val uuid = UUID.randomUUID()
+      val form = Form(FormField.Simple("test", uuid.toString))
+      val decoded = summon[FormDecoder[UUID]].decode(form)
+      assert(decoded == Right(uuid))
+    }
+
+    test("decode UUID fails on invalid string") {
+      val form = Form(FormField.Simple("test", "not-a-uuid"))
+      val decoded = summon[FormDecoder[UUID]].decode(form)
+      assert(decoded.isLeft)
     }
 
   }
