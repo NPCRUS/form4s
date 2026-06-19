@@ -1,4 +1,4 @@
-package form
+package form4s
 
 trait Form[Out] {
   def compose(out: Out*): Out
@@ -75,7 +75,7 @@ trait Form[Out] {
       input: zio.http.Form
   )(using
       schema: T[FieldSchema],
-      decoder: util.FormDecoder[T[[T] =>> T]]
+      decoder: FormDecoder[T[[T] =>> T]]
   ): Either[Map[String, Seq[String]], T[[T] =>> T]] =
     decoder.decode(input) match {
       case Left(errors) =>

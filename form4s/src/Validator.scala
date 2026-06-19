@@ -1,4 +1,4 @@
-package form
+package form4s
 
 trait Validator[T] {
   def validate(in: T): Seq[String]

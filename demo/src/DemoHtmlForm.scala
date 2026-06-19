@@ -2,6 +2,7 @@ package demo
 
 import zio.http.template2.{form as formTag, *}
 import form.Form
+import java.util.UUID
 
 object DemoHtmlForm extends Form[Dom] {
   def compose(out: Dom*): Dom = fragment(out*)
@@ -39,6 +40,48 @@ object DemoHtmlForm extends Form[Dom] {
         schema: FieldSchema[Int],
         fieldName: String,
         oldValue: Option[Int],
+        errors: Seq[String]
+    ): Dom =
+      div(
+        `class` := "mb-4",
+        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        input(
+          name := fieldName,
+          `type` := schema.typeAttr,
+          placeholder := schema.placeholderAttr,
+          `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
+          oldValue.map(v => value := v.toString)
+        ),
+        errors.map(e => p(`class` := errorCls, text(e)))
+      )
+  }
+
+  val longRenderable: Renderable[Long] = new Renderable[Long] {
+    def draw(
+        schema: FieldSchema[Long],
+        fieldName: String,
+        oldValue: Option[Long],
+        errors: Seq[String]
+    ): Dom =
+      div(
+        `class` := "mb-4",
+        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        input(
+          name := fieldName,
+          `type` := schema.typeAttr,
+          placeholder := schema.placeholderAttr,
+          `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
+          oldValue.map(v => value := v.toString)
+        ),
+        errors.map(e => p(`class` := errorCls, text(e)))
+      )
+  }
+
+  val uuidRenderable: Renderable[UUID] = new Renderable[UUID] {
+    def draw(
+        schema: FieldSchema[UUID],
+        fieldName: String,
+        oldValue: Option[UUID],
         errors: Seq[String]
     ): Dom =
       div(

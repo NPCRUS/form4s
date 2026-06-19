@@ -1,4 +1,4 @@
-package util
+package form4s
 
 import zio.http.Form
 import magnolia1.*

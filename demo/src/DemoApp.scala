@@ -5,6 +5,7 @@ import zio.http.*
 import zio.http.template2.{form as formTag, *}
 import form.Validator
 import util.{FormDecoder, DecodingError}
+import java.util.UUID
 
 enum Role:
   case Student, Developer, Designer, Manager, Other
@@ -22,6 +23,8 @@ case class RegistrationForm[F[_]](
     username: F[String],
     email: F[String],
     age: F[Int],
+    score: F[Long],
+    referralId: F[UUID],
     role: F[Role],
     bio: F[Option[String]],
     agree: F[Boolean]
@@ -51,6 +54,18 @@ object DemoApp extends ZIOAppDefault {
       placeholderAttr = "Введите возраст",
       typeAttr = "number",
       validator = Validator.compose(Validator.min(1), Validator.max(150))
+    ),
+    score = DemoHtmlForm.FieldSchema(
+      label = "Баллы",
+      renderer = DemoHtmlForm.longRenderable,
+      placeholderAttr = "Введите баллы",
+      typeAttr = "number"
+    ),
+    referralId = DemoHtmlForm.FieldSchema(
+      label = "Реферальный ID",
+      renderer = DemoHtmlForm.uuidRenderable,
+      placeholderAttr = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      typeAttr = "text"
     ),
     role = DemoHtmlForm.FieldSchema(
       label = "Роль",
@@ -146,6 +161,22 @@ object DemoApp extends ZIOAppDefault {
                   text("Возраст")
                 ),
                 dd(`class` := "text-sm text-gray-900", text(data.age.toString)),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
+                  text("Баллы")
+                ),
+                dd(
+                  `class` := "text-sm text-gray-900",
+                  text(data.score.toString)
+                ),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
+                  text("Реферальный ID")
+                ),
+                dd(
+                  `class` := "text-sm text-gray-900",
+                  text(data.referralId.toString)
+                ),
                 dt(
                   `class` := "text-sm font-medium text-gray-500",
                   text("Роль")
