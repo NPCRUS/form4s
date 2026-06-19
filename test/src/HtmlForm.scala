@@ -1,4 +1,4 @@
-package form
+package form4s
 
 import zio.http.template2.{form as formTag, *}
 

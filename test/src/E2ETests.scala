@@ -1,4 +1,4 @@
-package form
+package form4s
 
 import utest.*
 import zio.*

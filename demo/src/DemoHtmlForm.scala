@@ -1,7 +1,7 @@
 package demo
 
 import zio.http.template2.{form as formTag, *}
-import form.Form
+import form4s.Form
 import java.util.UUID
 
 object DemoHtmlForm extends Form[Dom] {

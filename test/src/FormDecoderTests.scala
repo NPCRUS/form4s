@@ -1,4 +1,4 @@
-package util
+package form4s
 
 import utest._
 import zio.http.{Form, FormField, MediaType}
