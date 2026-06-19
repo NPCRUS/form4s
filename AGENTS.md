@@ -18,6 +18,7 @@ form4s — a Scala 3 library for type-safe web form rendering, decoding, and val
 | Test | `./mill test` |
 | Format | `./mill mill.scalalib.scalafmt.ScalafmtModule/reformatAll __.sources` |
 | Format check | `./mill mill.scalalib.scalafmt.ScalafmtModule/checkFormatAll __.sources` |
+| Run demo | `./mill demo.run` |
 
 ## Dependencies
 

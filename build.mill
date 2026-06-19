@@ -22,6 +22,11 @@ object form4s extends ScalaModule with PublishModule {
   )
 }
 
+object demo extends ScalaModule {
+  def scalaVersion = "3.8.4"
+  def moduleDeps = Seq(form4s)
+}
+
 object test extends ScalaModule with TestModule.Utest {
   def scalaVersion = "3.8.4"
   def moduleDeps = Seq(form4s)
