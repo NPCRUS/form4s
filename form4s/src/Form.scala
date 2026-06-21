@@ -11,16 +11,6 @@ trait Form[Out] {
         errors: Seq[String]
     ): Out
 
-    def amend(f: Out => Out): Renderable[T] = new Renderable[T] {
-      def draw(
-          schema: FieldSchema[T],
-          fieldName: String,
-          oldValue: Option[T],
-          errors: Seq[String]
-      ): Out =
-        f(that.draw(schema, fieldName, oldValue, errors))
-    }
-
     def optional: Renderable[Option[T]] = new Renderable[Option[T]] {
       def draw(
           schema: FieldSchema[Option[T]],
