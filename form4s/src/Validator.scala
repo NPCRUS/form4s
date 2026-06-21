@@ -25,6 +25,9 @@ object Validator {
   val isEmail: Validator[String] = in =>
     if (!in.contains("@")) Seq("Некорректный email") else Seq.empty
 
+  val isPhone: Validator[String] = in =>
+    if (!"""^\+\d{10,15}$""".r.matches(in)) Seq("Некорректный номер телефона") else Seq.empty
+
   def matches(regex: scala.util.matching.Regex): Validator[String] = in =>
     if (!regex.matches(in)) Seq("Неверный формат") else Seq.empty
 
