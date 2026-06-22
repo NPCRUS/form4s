@@ -25,7 +25,7 @@ object E2ETests extends TestSuite {
       renderer = HtmlForm.stringRenderable,
       placeholderAttr = "Enter username",
       typeAttr = "text",
-      validator = Validator.nonEmpty
+      validator = Validator.nonEmpty.toZIO
     ),
     age = HtmlForm.FieldSchema(
       label = "Age",
@@ -52,40 +52,41 @@ object E2ETests extends TestSuite {
       )
     },
     Method.POST / "" -> handler { (req: Request) =>
-      req.body.asURLEncodedForm.map { formData =>
-        val result = HtmlForm.decodeAndValidate[TestUserForm](formData)
-        lastDecodeResult.set(result)
-        result match {
-          case Right(user) =>
-            Response.html(
-              html(
-                head(meta(charset := "utf-8")),
-                body(
-                  div(
-                    id := "result",
-                    text(s"Success: ${user.username}, ${user.age}")
+      req.body.asURLEncodedForm.flatMap { formData =>
+        HtmlForm.decodeAndValidate[TestUserForm](formData).map { result =>
+          lastDecodeResult.set(result)
+          result match {
+            case Right(user) =>
+              Response.html(
+                html(
+                  head(meta(charset := "utf-8")),
+                  body(
+                    div(
+                      id := "result",
+                      text(s"Success: ${user.username}, ${user.age}")
+                    )
                   )
                 )
               )
-            )
-          case Left(errors) =>
-            val errorDivs = errors.toSeq.flatMap { case (field, msgs) =>
-              msgs.map(m => p(`class` := "form-error", text(s"$field: $m")))
-            }
-            Response.html(
-              html(
-                head(meta(charset := "utf-8")),
-                body(
-                  div(id := "errors", errorDivs),
-                  formTag(
-                    method := "post",
-                    action := "/",
-                    HtmlForm.draw[TestUserForm](None, errors),
-                    button(`type` := "submit", text("Submit"))
+            case Left(errors) =>
+              val errorDivs = errors.toSeq.flatMap { case (field, msgs) =>
+                msgs.map(m => p(`class` := "form-error", text(s"$field: $m")))
+              }
+              Response.html(
+                html(
+                  head(meta(charset := "utf-8")),
+                  body(
+                    div(id := "errors", errorDivs),
+                    formTag(
+                      method := "post",
+                      action := "/",
+                      HtmlForm.draw[TestUserForm](None, errors),
+                      button(`type` := "submit", text("Submit"))
+                    )
                   )
                 )
               )
-            )
+          }
         }
       }
     }

@@ -75,7 +75,7 @@ trait Form[Out] {
           (names(idx), errors)
         }
       }.toSeq)
-      .map(_.toMap)
+      .map(_.filter(_._2.nonEmpty).toMap)
   }
 
   def decodeAndValidate[T[F[_]] <: Product](

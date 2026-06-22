@@ -38,7 +38,9 @@ object ValidatorTests extends TestSuite {
     }
 
     test("maxLength invalid") {
-      assert(Validator.maxLength(3).validate("abcd") == Seq("Максимум 3 символов"))
+      assert(
+        Validator.maxLength(3).validate("abcd") == Seq("Максимум 3 символов")
+      )
     }
 
     test("isEmail valid") {
@@ -54,7 +56,9 @@ object ValidatorTests extends TestSuite {
     }
 
     test("matches invalid") {
-      assert(Validator.matches("""\d+""".r).validate("abc") == Seq("Неверный формат"))
+      assert(
+        Validator.matches("""\d+""".r).validate("abc") == Seq("Неверный формат")
+      )
     }
 
     test("min valid") {
@@ -80,7 +84,9 @@ object ValidatorTests extends TestSuite {
     }
 
     test("requiredTrue invalid") {
-      assert(Validator.requiredTrue.validate(false) == Seq("Требуется подтверждение"))
+      assert(
+        Validator.requiredTrue.validate(false) == Seq("Требуется подтверждение")
+      )
     }
 
     test("compose empty") {
@@ -92,11 +98,17 @@ object ValidatorTests extends TestSuite {
     }
 
     test("compose single failing") {
-      assert(Validator.compose(Validator.nonEmpty).validate("") == Seq("Пустое поле запрещено"))
+      assert(
+        Validator.compose(Validator.nonEmpty).validate("") == Seq(
+          "Пустое поле запрещено"
+        )
+      )
     }
 
     test("compose multiple failures") {
-      val errors = Validator.compose(Validator.minLength(5), Validator.minLength(10)).validate("x")
+      val errors = Validator
+        .compose(Validator.minLength(5), Validator.minLength(10))
+        .validate("x")
       assert(errors == Seq("Минимум 5 символов", "Минимум 10 символов"))
     }
 
