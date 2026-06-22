@@ -5,6 +5,9 @@ trait Validator[T] { that =>
 
   def toZIO: ValidatorZIO[T] =
     ValidatorZIO.fromPure(that)
+
+  def contramap[U](f: U => T): Validator[U] =
+    in => that.validate(f(in))
 }
 
 object Validator {

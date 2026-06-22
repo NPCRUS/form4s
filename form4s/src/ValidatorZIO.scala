@@ -2,8 +2,11 @@ package form4s
 
 import zio.*
 
-trait ValidatorZIO[T] {
+trait ValidatorZIO[T] { that =>
   def validate(in: T): ZIO[Any, Nothing, Seq[String]]
+
+  def contramap[U](f: U => T): ValidatorZIO[U] =
+    in => that.validate(f(in))
 }
 
 object ValidatorZIO {
