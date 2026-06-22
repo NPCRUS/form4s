@@ -96,6 +96,9 @@ trait Form[Out] {
     }
 }
 
+object IncompleteForm {
+  def empty[T[V[_]]]: IncompleteForm[T] = IncompleteForm(Map.empty, None)
+}
 case class IncompleteForm[T[V[_]]](
     errors: Map[String, Seq[String]],
     oldForm: Option[T[[T] =>> T]]
