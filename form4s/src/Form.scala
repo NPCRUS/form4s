@@ -1,5 +1,7 @@
 package form4s
 
+import zio.ZIO
+
 trait Form[Out] {
   def compose(out: Out*): Out
 
@@ -32,7 +34,7 @@ trait Form[Out] {
       renderer: Renderable[T],
       placeholderAttr: String,
       typeAttr: String,
-      validator: Validator[T] = Validator.empty[T],
+      validator: ValidatorZIO[T] = Validator.empty[T].toZIO,
       options: Seq[String] = Seq.empty
   )
 
@@ -60,15 +62,20 @@ trait Form[Out] {
 
   def validate[T[F[_]] <: Product](
       formData: T[[T] =>> T]
-  )(using schema: T[FieldSchema]): Map[String, Seq[String]] = {
+  )(using
+      schema: T[FieldSchema]
+  ): ZIO[Any, Nothing, Map[String, Seq[String]]] = {
     val schemas = schema.productIterator.toSeq
     val names = formData.productElementNames.toSeq
-    formData.productIterator.zipWithIndex.map { (value, idx) =>
-      type Gen
-      val schema = schemas(idx).asInstanceOf[FieldSchema[Gen]]
-      val errors = schema.validator.validate(value.asInstanceOf[Gen])
-      (names(idx), errors)
-    }.toMap
+    ZIO
+      .collectAllPar(formData.productIterator.zipWithIndex.map { (value, idx) =>
+        type Gen
+        val schema = schemas(idx).asInstanceOf[FieldSchema[Gen]]
+        schema.validator.validate(value.asInstanceOf[Gen]).map { errors =>
+          (names(idx), errors)
+        }
+      }.toSeq)
+      .map(_.toMap)
   }
 
   def decodeAndValidate[T[F[_]] <: Product](
@@ -76,13 +83,14 @@ trait Form[Out] {
   )(using
       schema: T[FieldSchema],
       decoder: FormDecoder[T[[T] =>> T]]
-  ): Either[Map[String, Seq[String]], T[[T] =>> T]] =
+  ): ZIO[Any, Nothing, Either[Map[String, Seq[String]], T[[T] =>> T]]] =
     decoder.decode(input) match {
       case Left(errors) =>
-        Left(errors.groupMap(_.field)(_.message))
+        ZIO.succeed(Left(errors.groupMap(_.field)(_.message)))
       case Right(decoded) =>
-        val validationErrors = validate(decoded).filter(_._2.nonEmpty)
-        if (validationErrors.nonEmpty) Left(validationErrors)
-        else Right(decoded)
+        validate(decoded).map { validationErrors =>
+          if (validationErrors.nonEmpty) Left(validationErrors)
+          else Right(decoded)
+        }
     }
 }
