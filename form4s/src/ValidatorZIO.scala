@@ -7,6 +7,9 @@ trait ValidatorZIO[T] { that =>
 
   def contramap[U](f: U => T): ValidatorZIO[U] =
     in => that.validate(f(in))
+
+  def map(f: T => T): ValidatorZIO[T] =
+    in => that.validate(f(in))
 }
 
 object ValidatorZIO {

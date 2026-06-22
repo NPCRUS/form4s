@@ -83,14 +83,20 @@ trait Form[Out] {
   )(using
       schema: T[FieldSchema],
       decoder: FormDecoder[T[[T] =>> T]]
-  ): ZIO[Any, Nothing, Either[Map[String, Seq[String]], T[[T] =>> T]]] =
+  ): ZIO[Any, IncompleteForm[T], T[[T] =>> T]] =
     decoder.decode(input) match {
       case Left(errors) =>
-        ZIO.succeed(Left(errors.groupMap(_.field)(_.message)))
+        ZIO.fail(IncompleteForm(errors.groupMap(_.field)(_.message), None))
       case Right(decoded) =>
-        validate(decoded).map { validationErrors =>
-          if (validationErrors.nonEmpty) Left(validationErrors)
-          else Right(decoded)
+        validate(decoded).flatMap { validationErrors =>
+          if (validationErrors.nonEmpty)
+            ZIO.fail(IncompleteForm(validationErrors, Some(decoded)))
+          else ZIO.succeed(decoded)
         }
     }
 }
+
+case class IncompleteForm[T[V[_]]](
+    errors: Map[String, Seq[String]],
+    oldForm: Option[T[[T] =>> T]]
+)
