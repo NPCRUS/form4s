@@ -38,21 +38,21 @@ object DemoApp extends ZIOAppDefault {
       renderer = DemoHtmlForm.stringRenderable,
       placeholderAttr = "Введите имя",
       typeAttr = "text",
-      validator = Validator.compose(Validator.nonEmpty, Validator.minLength(3))
+      validator = Validator.compose(Validator.nonEmpty, Validator.minLength(3)).toZIO
     ),
     email = DemoHtmlForm.FieldSchema(
       label = "Email",
       renderer = DemoHtmlForm.stringRenderable,
       placeholderAttr = "example@mail.com",
       typeAttr = "email",
-      validator = Validator.compose(Validator.nonEmpty, Validator.isEmail)
+      validator = Validator.compose(Validator.nonEmpty, Validator.isEmail).toZIO
     ),
     age = DemoHtmlForm.FieldSchema(
       label = "Возраст",
       renderer = DemoHtmlForm.intRenderable,
       placeholderAttr = "Введите возраст",
       typeAttr = "number",
-      validator = Validator.compose(Validator.min(1), Validator.max(150))
+      validator = Validator.compose(Validator.min(1), Validator.max(150)).toZIO
     ),
     score = DemoHtmlForm.FieldSchema(
       label = "Баллы",
@@ -84,7 +84,7 @@ object DemoApp extends ZIOAppDefault {
       renderer = DemoHtmlForm.boolRenderable,
       placeholderAttr = "",
       typeAttr = "checkbox",
-      validator = Validator.requiredTrue
+      validator = Validator.requiredTrue.toZIO
     )
   )
 
@@ -209,29 +209,19 @@ object DemoApp extends ZIOAppDefault {
       renderPage(DemoHtmlForm.draw[RegistrationForm](None, Map.empty))
     },
     Method.POST / "" -> handler { (req: Request) =>
-      req.body.asURLEncodedForm.map { fd =>
-        FormDecoder.decode[RegistrationFormData](fd) match {
-          case Left(errors) =>
-            renderPage(
-              DemoHtmlForm.draw[RegistrationForm](
-                None,
-                errors.groupMap(_.field)(_.message)
-              )
-            )
-          case Right(decoded) =>
-            val validationErrors =
-              DemoHtmlForm
-                .validate[RegistrationForm](decoded)
-                .filter(_._2.nonEmpty)
-            if (validationErrors.nonEmpty)
+      req.body.asURLEncodedForm.flatMap { fd =>
+        DemoHtmlForm
+          .decodeAndValidate[RegistrationForm](fd)
+          .fold(
+            incomplete =>
               renderPage(
                 DemoHtmlForm.draw[RegistrationForm](
-                  Some(decoded),
-                  validationErrors
+                  incomplete.oldForm,
+                  incomplete.errors
                 )
-              )
-            else renderSuccess(decoded)
-        }
+              ),
+            renderSuccess
+          )
       }
     }
   )
