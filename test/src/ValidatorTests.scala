@@ -146,5 +146,44 @@ object ValidatorTests extends TestSuite {
       val errors = Validator.isPhone.validate("")
       assert(errors == Seq("Некорректный номер телефона"))
     }
+
+    test("positive valid") {
+      assert(Validator.positive.validate(1).isEmpty)
+      assert(Validator.positive.validate(100).isEmpty)
+    }
+
+    test("positive invalid zero") {
+      assert(Validator.positive.validate(0) == Seq("Значение должно быть положительным"))
+    }
+
+    test("positive invalid negative") {
+      assert(Validator.positive.validate(-5) == Seq("Значение должно быть положительным"))
+    }
+
+    test("isUrl valid http") {
+      assert(Validator.isUrl.validate("http://example.com").isEmpty)
+    }
+
+    test("isUrl valid https") {
+      assert(Validator.isUrl.validate("https://example.com/path?a=1").isEmpty)
+    }
+
+    test("isUrl invalid no protocol") {
+      assert(Validator.isUrl.validate("example.com") == Seq("Некорректный URL"))
+    }
+
+    test("isUrl invalid empty") {
+      assert(Validator.isUrl.validate("") == Seq("Некорректный URL"))
+    }
+
+    test("custom valid") {
+      val even = Validator.custom[Int]("Должно быть чётным")(_ % 2 == 0)
+      assert(even.validate(4).isEmpty)
+    }
+
+    test("custom invalid") {
+      val even = Validator.custom[Int]("Должно быть чётным")(_ % 2 == 0)
+      assert(even.validate(3) == Seq("Должно быть чётным"))
+    }
   }
 }

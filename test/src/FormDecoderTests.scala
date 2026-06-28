@@ -216,11 +216,10 @@ object FormDecoderTests extends TestSuite {
       assert(decoded == Right(LocalDateTime.of(2024, 1, 15, 10, 0)))
     }
 
-    test("decode LocalDateTime throws on invalid string") {
+    test("decode LocalDateTime returns error on invalid string") {
       val form = Form(FormField.Simple("test", "garbage"))
-      intercept[Exception] {
-        summon[FormDecoder[LocalDateTime]].decode(form)
-      }
+      val decoded = summon[FormDecoder[LocalDateTime]].decode(form)
+      assert(decoded.isLeft)
     }
 
     test("decode Option from empty form returns None") {
@@ -340,6 +339,61 @@ object FormDecoderTests extends TestSuite {
       val form = Form(FormField.Simple("test", "not-a-uuid"))
       val decoded = summon[FormDecoder[UUID]].decode(form)
       assert(decoded.isLeft)
+    }
+
+    test("decode Double from simple field") {
+      val form = Form(FormField.Simple("test", "3.14"))
+      val decoded = summon[FormDecoder[Double]].decode(form)
+      assert(decoded == Right(3.14))
+    }
+
+    test("decode Double negative") {
+      val form = Form(FormField.Simple("test", "-2.5"))
+      val decoded = summon[FormDecoder[Double]].decode(form)
+      assert(decoded == Right(-2.5))
+    }
+
+    test("decode Double fails on non-numeric") {
+      val form = Form(FormField.Simple("test", "abc"))
+      val decoded = summon[FormDecoder[Double]].decode(form)
+      assert(decoded.isLeft)
+    }
+
+    test("decode Float from simple field") {
+      val form = Form(FormField.Simple("test", "2.718"))
+      val decoded = summon[FormDecoder[Float]].decode(form)
+      assert(decoded == Right(2.718f))
+    }
+
+    test("decode Float fails on non-numeric") {
+      val form = Form(FormField.Simple("test", "xyz"))
+      val decoded = summon[FormDecoder[Float]].decode(form)
+      assert(decoded.isLeft)
+    }
+
+    test("decode BigDecimal from simple field") {
+      val form = Form(FormField.Simple("test", "123.456"))
+      val decoded = summon[FormDecoder[BigDecimal]].decode(form)
+      assert(decoded == Right(BigDecimal("123.456")))
+    }
+
+    test("decode BigDecimal fails on non-numeric") {
+      val form = Form(FormField.Simple("test", "not-a-number"))
+      val decoded = summon[FormDecoder[BigDecimal]].decode(form)
+      assert(decoded.isLeft)
+    }
+
+    test("FormDecoder map transforms value") {
+      val decoder = summon[FormDecoder[Int]]
+      val mapped = decoder.map(_.toString)
+      val form = Form(FormField.Simple("test", "42"))
+      assert(mapped.decode(form) == Right("42"))
+    }
+
+    test("FormDecoder map preserves isOptional") {
+      val optionalDecoder = summon[FormDecoder[Option[String]]]
+      val mapped = optionalDecoder.map(_.map(_.toUpperCase))
+      assert(mapped.isOptional)
     }
 
   }
