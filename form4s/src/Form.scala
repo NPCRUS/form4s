@@ -83,7 +83,7 @@ trait Form[Out] {
   )(using
       schema: T[FieldSchema],
       decoder: FormDecoder[T[[T] =>> T]]
-  ): ZIO[Any, IncompleteForm[T], T[[T] =>> T]] =
+  ): ZIO[Any, IncompleteForm[T[[T] =>> T]], T[[T] =>> T]] =
     decoder.decode(input) match {
       case Left(errors) =>
         ZIO.fail(IncompleteForm(errors.groupMap(_.field)(_.message), None))
@@ -96,10 +96,7 @@ trait Form[Out] {
     }
 }
 
-object IncompleteForm {
-  def empty[T[V[_]]]: IncompleteForm[T] = IncompleteForm(Map.empty, None)
-}
-case class IncompleteForm[T[V[_]]](
+case class IncompleteForm[A](
     errors: Map[String, Seq[String]],
-    oldForm: Option[T[[T] =>> T]]
+    oldForm: Option[A]
 )
