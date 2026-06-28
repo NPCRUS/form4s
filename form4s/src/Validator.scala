@@ -49,4 +49,14 @@ object Validator {
 
   val requiredTrue: Validator[Boolean] = in =>
     if (!in) Seq("Требуется подтверждение") else Seq.empty
+
+  val positive: Validator[Int] = in =>
+    if (in > 0) Seq.empty else Seq("Значение должно быть положительным")
+
+  val isUrl: Validator[String] = in =>
+    if ("""^https?://[^\s]+""".r.matches(in)) Seq.empty
+    else Seq("Некорректный URL")
+
+  def custom[T](message: String)(predicate: T => Boolean): Validator[T] =
+    in => if (predicate(in)) Seq.empty else Seq(message)
 }
