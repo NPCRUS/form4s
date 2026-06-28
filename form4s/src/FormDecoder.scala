@@ -10,13 +10,20 @@ import zio.http.Charsets
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import scala.math.BigDecimal
 
 case class DecodingError(field: String, message: String)
 
-trait FormDecoder[T] {
+trait FormDecoder[T] { that =>
   def decode(input: Form): Either[Seq[DecodingError], T]
 
   def isOptional: Boolean = false
+
+  def map[U](f: T => U): FormDecoder[U] = new FormDecoder[U] {
+    def decode(input: Form): Either[Seq[DecodingError], U] =
+      that.decode(input).map(f)
+    override def isOptional: Boolean = that.isOptional
+  }
 }
 object FormDecoder extends AutoDerivation[FormDecoder] {
 
@@ -75,6 +82,40 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  given FormDecoder[Double] = new FormDecoder[Double] {
+    def decode(input: Form): Either[Seq[DecodingError], Double] =
+      stringDecoder
+        .decode(input)
+        .flatMap(v =>
+          v.toDoubleOption.toRight(
+            Seq(DecodingError("", "Невозможно преобразовать в число"))
+          )
+        )
+  }
+
+  given FormDecoder[Float] = new FormDecoder[Float] {
+    def decode(input: Form): Either[Seq[DecodingError], Float] =
+      stringDecoder
+        .decode(input)
+        .flatMap(v =>
+          v.toFloatOption.toRight(
+            Seq(DecodingError("", "Невозможно преобразовать в число"))
+          )
+        )
+  }
+
+  given FormDecoder[BigDecimal] = new FormDecoder[BigDecimal] {
+    def decode(input: Form): Either[Seq[DecodingError], BigDecimal] =
+      stringDecoder
+        .decode(input)
+        .flatMap(v =>
+          try Right(BigDecimal(v))
+          catch
+            case _: Exception =>
+              Left(Seq(DecodingError("", "Невозможно преобразовать в число")))
+        )
+  }
+
   given FormDecoder[UUID] = new FormDecoder[UUID] {
     def decode(input: Form): Either[Seq[DecodingError], UUID] =
       stringDecoder
@@ -112,8 +153,10 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         .flatMap(v =>
           try Right(LocalDateTime.parse(v, dateTimeFormatter))
           catch
-            case e: Exception =>
-              Right(LocalDateTime.parse(v + ":00", dateTimeFormatter))
+            case _: Exception =>
+              try Right(LocalDateTime.parse(v + ":00", dateTimeFormatter))
+              catch case _: Exception =>
+                Left(Seq(DecodingError("", "Невозможно преобразовать дату/время")))
         )
   }
 
