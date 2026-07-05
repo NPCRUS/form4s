@@ -47,8 +47,28 @@ object ValidatorTests extends TestSuite {
       assert(Validator.isEmail.validate("a@b").isEmpty)
     }
 
-    test("isEmail invalid") {
+    test("isEmail valid with dots and plus") {
+      assert(Validator.isEmail.validate("john.doe+tag@example.com").isEmpty)
+    }
+
+    test("isEmail invalid no at") {
       assert(Validator.isEmail.validate("no-at") == Seq("Некорректный email"))
+    }
+
+    test("isEmail invalid space") {
+      assert(
+        Validator.isEmail.validate("a b@example.com") == Seq("Некорректный email")
+      )
+    }
+
+    test("isEmail invalid leading at") {
+      assert(
+        Validator.isEmail.validate("@example.com") == Seq("Некорректный email")
+      )
+    }
+
+    test("isEmail invalid trailing junk") {
+      assert(Validator.isEmail.validate("a@b c") == Seq("Некорректный email"))
     }
 
     test("matches valid") {

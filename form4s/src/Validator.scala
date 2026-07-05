@@ -32,7 +32,9 @@ object Validator {
     if (in.length > n) Seq(s"Максимум $n символов") else Seq.empty
 
   val isEmail: Validator[String] = in =>
-    if (!in.contains("@")) Seq("Некорректный email") else Seq.empty
+    if (!"""^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$""".r.matches(in))
+      Seq("Некорректный email")
+    else Seq.empty
 
   val isPhone: Validator[String] = in =>
     if (!"""^\+\d{10,15}$""".r.matches(in)) Seq("Некорректный номер телефона")

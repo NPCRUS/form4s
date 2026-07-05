@@ -100,3 +100,7 @@ case class IncompleteForm[A](
     errors: Map[String, Seq[String]],
     oldForm: Option[A]
 )
+
+object IncompleteForm {
+  def empty[A]: IncompleteForm[A] = IncompleteForm(Map.empty, None)
+}
