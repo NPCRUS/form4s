@@ -54,7 +54,7 @@ object DecodeAndValidateTests extends TestSuite {
       val result = run(HtmlForm.decodeAndValidate[AccountForm](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
-      assert(incomplete.errors("login") == Seq("Пустое поле запрещено"))
+      assert(incomplete.errors("login") == Seq("Поле должно быть заполнено"))
       assert(!incomplete.errors.contains("age"))
       assert(incomplete.oldForm.isDefined)
       assert(incomplete.oldForm.get.login == "")

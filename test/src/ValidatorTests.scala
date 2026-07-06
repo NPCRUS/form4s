@@ -14,7 +14,7 @@ object ValidatorTests extends TestSuite {
     }
 
     test("nonEmpty invalid") {
-      assert(Validator.nonEmpty.validate("") == Seq("Пустое поле запрещено"))
+      assert(Validator.nonEmpty.validate("") == Seq("Поле должно быть заполнено"))
     }
 
     test("required valid") {
@@ -122,7 +122,7 @@ object ValidatorTests extends TestSuite {
     test("compose single failing") {
       assert(
         Validator.compose(Validator.nonEmpty).validate("") == Seq(
-          "Пустое поле запрещено"
+          "Поле должно быть заполнено"
         )
       )
     }

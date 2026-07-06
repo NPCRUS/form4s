@@ -18,7 +18,7 @@ object ValidatorZIOTests extends TestSuite {
       assert(run(Validator.nonEmpty.toZIO.validate("covfefe")).isEmpty)
       assert(
         run(Validator.nonEmpty.toZIO.validate("")) == Seq(
-          "Пустое поле запрещено"
+          "Поле должно быть заполнено"
         )
       )
     }

@@ -23,7 +23,7 @@ object Validator {
   def empty[T]: Validator[T] = _ => Seq.empty
 
   val nonEmpty: Validator[String] = in =>
-    if (in.isEmpty()) Seq("Пустое поле запрещено") else Seq.empty
+    if (in.isEmpty()) Seq("Поле должно быть заполнено") else Seq.empty
 
   val required: Validator[Option[?]] = in =>
     if (in.isEmpty) Seq("Обязательное поле") else Seq.empty

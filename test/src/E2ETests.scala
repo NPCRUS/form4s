@@ -161,10 +161,10 @@ object E2ETests extends TestSuite {
       page.click("button[type=submit]")
       page.waitForLoadState()
       val bodyText = page.textContent("body")
-      assert(bodyText.contains("Пустое поле запрещено"))
+      assert(bodyText.contains("Поле должно быть заполнено"))
       val result = lastDecodeResult.get()
       val errors = result.swap.getOrElse(Map.empty)
-      assert(errors("username") == Seq("Пустое поле запрещено"))
+      assert(errors("username") == Seq("Поле должно быть заполнено"))
       assert(!errors.contains("age"))
       page.close()
     }
