@@ -396,5 +396,55 @@ object FormDecoderTests extends TestSuite {
       assert(mapped.isOptional)
     }
 
+    test("split decodes parameterless enum by full type name") {
+      enum Color derives FormDecoder {
+        case Red
+        case Blue
+      }
+      val form = Form(FormField.Simple("color", "Red"))
+      val decoded = summon[FormDecoder[Color]].decode(form)
+      assert(decoded == Right(Color.Red))
+    }
+
+    test("split returns error for unknown enum variant") {
+      enum Color derives FormDecoder {
+        case Red
+        case Blue
+      }
+      val form = Form(FormField.Simple("color", "Green"))
+      val decoded = summon[FormDecoder[Color]].decode(form)
+      assert(
+        decoded == Left(
+          Seq(DecodingError("", "Нет такого варианта выбора"))
+        )
+      )
+    }
+
+    test("split returns error on empty form for enum") {
+      enum Color derives FormDecoder {
+        case Red
+        case Blue
+      }
+      val decoded = summon[FormDecoder[Color]].decode(Form())
+      assert(
+        decoded == Left(
+          Seq(DecodingError("", "Нет такого варианта выбора"))
+        )
+      )
+    }
+
+    test("split returns error for non-enum sealed trait") {
+      sealed trait Shape derives FormDecoder
+      case class Circle(radius: Int) extends Shape derives FormDecoder
+      case class Square(side: Int) extends Shape derives FormDecoder
+      val form = Form(FormField.Simple("shape", "anything"))
+      val decoded = summon[FormDecoder[Shape]].decode(form)
+      assert(
+        decoded == Left(
+          Seq(DecodingError("", "Невозможно декодировать ast"))
+        )
+      )
+    }
+
   }
 }

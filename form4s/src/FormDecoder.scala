@@ -155,8 +155,13 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
           catch
             case _: Exception =>
               try Right(LocalDateTime.parse(v + ":00", dateTimeFormatter))
-              catch case _: Exception =>
-                Left(Seq(DecodingError("", "Невозможно преобразовать дату/время")))
+              catch
+                case _: Exception =>
+                  Left(
+                    Seq(
+                      DecodingError("", "Невозможно преобразовать дату/время")
+                    )
+                  )
         )
   }
 
@@ -259,7 +264,19 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
   ): FormDecoder[T] =
     new FormDecoder[T] {
       def decode(input: Form): Either[Seq[DecodingError], T] =
-        Left(Seq(DecodingError("", "Невозможно декодировать sealed trait")))
+        if (sealedTrait.isEnum) {
+          input.formData.headOption.flatMap(field =>
+            sealedTrait.subtypes.find(
+              _.typeInfo.short == field.stringValue.getOrElse("")
+            )
+          ) match
+            case Some(value) =>
+              value.typeclass.decode(input)
+            case None =>
+              Left(Seq(DecodingError("", "Нет такого варианта выбора")))
+        } else {
+          Left(Seq(DecodingError("", "Невозможно декодировать ast")))
+        }
     }
 
 }
