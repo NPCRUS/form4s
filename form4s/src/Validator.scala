@@ -11,6 +11,9 @@ trait Validator[T] { that =>
 
   def map(f: T => T): Validator[T] =
     in => that.validate(f(in))
+
+  def option: Validator[Option[T]] =
+    opt => opt.fold(Seq.empty)(that.validate)
 }
 
 object Validator {

@@ -57,7 +57,9 @@ object ValidatorTests extends TestSuite {
 
     test("isEmail invalid space") {
       assert(
-        Validator.isEmail.validate("a b@example.com") == Seq("Некорректный email")
+        Validator.isEmail.validate("a b@example.com") == Seq(
+          "Некорректный email"
+        )
       )
     }
 
@@ -173,11 +175,19 @@ object ValidatorTests extends TestSuite {
     }
 
     test("positive invalid zero") {
-      assert(Validator.positive.validate(0) == Seq("Значение должно быть положительным"))
+      assert(
+        Validator.positive.validate(0) == Seq(
+          "Значение должно быть положительным"
+        )
+      )
     }
 
     test("positive invalid negative") {
-      assert(Validator.positive.validate(-5) == Seq("Значение должно быть положительным"))
+      assert(
+        Validator.positive.validate(-5) == Seq(
+          "Значение должно быть положительным"
+        )
+      )
     }
 
     test("isUrl valid http") {
@@ -204,6 +214,35 @@ object ValidatorTests extends TestSuite {
     test("custom invalid") {
       val even = Validator.custom[Int]("Должно быть чётным")(_ % 2 == 0)
       assert(even.validate(3) == Seq("Должно быть чётным"))
+    }
+
+    test("option None produces no errors") {
+      assert(Validator.minLength(3).option.validate(None).isEmpty)
+    }
+
+    test("option Some passing inner validator") {
+      assert(Validator.minLength(3).option.validate(Some("abcd")).isEmpty)
+    }
+
+    test("option Some failing inner validator") {
+      val errors = Validator.minLength(3).option.validate(Some("ab"))
+      assert(errors == Seq("Минимум 3 символов"))
+    }
+
+    test("option composed with required passes Some") {
+      val inner: Validator[Option[String]] = Validator.minLength(3).option
+      val requiredString: Validator[Option[String]] =
+        Validator.required.asInstanceOf[Validator[Option[String]]]
+      val v = Validator.compose(inner, requiredString)
+      assert(v.validate(Some("abcd")).isEmpty)
+    }
+
+    test("option composed with required fails on None") {
+      val inner: Validator[Option[String]] = Validator.minLength(3).option
+      val requiredString: Validator[Option[String]] =
+        Validator.required.asInstanceOf[Validator[Option[String]]]
+      val v = Validator.compose(inner, requiredString)
+      assert(v.validate(None) == Seq("Обязательное поле"))
     }
   }
 }
