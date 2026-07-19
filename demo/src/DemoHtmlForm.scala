@@ -7,12 +7,12 @@ import java.util.UUID
 object DemoHtmlForm extends Form[Dom] {
   def compose(out: Dom*): Dom = fragment(out*)
 
-  private val inputCls =
+  val inputCls: String =
     "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-  private val inputErrCls =
+  val inputErrCls: String =
     "mt-1 block w-full rounded-md border-red-500 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm border p-2"
-  private val labelCls = "block text-sm font-medium text-gray-700"
-  private val errorCls = "mt-1 text-sm text-red-600"
+  val labelCls: String = "block text-sm font-medium text-gray-700"
+  val errorCls: String = "mt-1 text-sm text-red-600"
 
   val stringRenderable: Renderable[String] = new Renderable[String] {
     def draw(
@@ -149,5 +149,27 @@ object DemoHtmlForm extends Form[Dom] {
           errors.map(e => p(`class` := errorCls, text(e)))
         )
       }
+    }
+
+  def subformRenderable[A[F[_]] <: Product](
+      subSchema: A[FieldSchema]
+  ): Renderable[A[FieldSchema]] =
+    new Renderable[A[FieldSchema]] {
+      def draw(
+          schema: FieldSchema[A[FieldSchema]],
+          fieldName: String,
+          oldValue: Option[A[FieldSchema]],
+          errors: Seq[String]
+      ): Dom =
+        val data = oldValue.asInstanceOf[Option[A[[X] =>> X]]]
+        val inner = drawSubform[A](fieldName, data, Map.empty)(using subSchema)
+        val modifiers: Seq[Modifier] =
+          label(
+            `class` := "block text-md font-semibold text-gray-700 mb-2",
+            text(schema.label)
+          ) +: (errors.map(e => p(`class` := errorCls, text(e))) :+ inner)
+        compose(
+          div(`class` := "mb-4 border p-4 rounded-lg bg-gray-50", modifiers*)
+        )
     }
 }

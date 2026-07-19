@@ -18,6 +18,11 @@ object Role:
           .toRight(Seq(DecodingError("", "Неизвестная роль")))
       }
 
+case class Address[F[_]](
+    city: F[String],
+    street: F[String]
+)
+
 case class RegistrationForm[F[_]](
     username: F[String],
     email: F[String],
@@ -26,11 +31,27 @@ case class RegistrationForm[F[_]](
     referralId: F[UUID],
     role: F[Role],
     bio: F[Option[String]],
-    agree: F[Boolean]
+    agree: F[Boolean],
+    address: F[Address[F]]
 )
 
 object DemoApp extends ZIOAppDefault {
   type RegistrationFormData = RegistrationForm[[T] =>> T]
+
+  private val addressSchema = Address(
+    city = DemoHtmlForm.FieldSchema(
+      label = "Город",
+      renderer = DemoHtmlForm.stringRenderable,
+      placeholderAttr = "Введите город",
+      typeAttr = "text"
+    ),
+    street = DemoHtmlForm.FieldSchema(
+      label = "Улица",
+      renderer = DemoHtmlForm.stringRenderable,
+      placeholderAttr = "Введите улицу",
+      typeAttr = "text"
+    )
+  )
 
   given RegistrationForm[DemoHtmlForm.FieldSchema] = RegistrationForm(
     username = DemoHtmlForm.FieldSchema(
@@ -38,7 +59,8 @@ object DemoApp extends ZIOAppDefault {
       renderer = DemoHtmlForm.stringRenderable,
       placeholderAttr = "Введите имя",
       typeAttr = "text",
-      validator = Validator.compose(Validator.nonEmpty, Validator.minLength(3)).toZIO
+      validator =
+        Validator.compose(Validator.nonEmpty, Validator.minLength(3)).toZIO
     ),
     email = DemoHtmlForm.FieldSchema(
       label = "Email",
@@ -85,6 +107,13 @@ object DemoApp extends ZIOAppDefault {
       placeholderAttr = "",
       typeAttr = "checkbox",
       validator = Validator.requiredTrue.toZIO
+    ),
+    address = DemoHtmlForm.FieldSchema(
+      label = "Адрес",
+      renderer = DemoHtmlForm.subformRenderable(addressSchema),
+      placeholderAttr = "",
+      typeAttr = "",
+      validator = Validator.empty.toZIO
     )
   )
 
@@ -191,6 +220,22 @@ object DemoApp extends ZIOAppDefault {
                 dd(
                   `class` := "text-sm text-gray-900",
                   text(data.bio.getOrElse("—"))
+                ),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
+                  text("Город")
+                ),
+                dd(
+                  `class` := "text-sm text-gray-900",
+                  text(data.address.city)
+                ),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
+                  text("Улица")
+                ),
+                dd(
+                  `class` := "text-sm text-gray-900",
+                  text(data.address.street)
                 )
               ),
               a(

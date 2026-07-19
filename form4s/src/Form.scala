@@ -60,6 +60,30 @@ trait Form[Out] {
     )
   }
 
+  def drawSubform[T[F[_]] <: Product](
+      prefix: String,
+      oldValue: Option[T[[T] =>> T]],
+      errors: Map[String, Seq[String]]
+  )(using
+      schema: T[FieldSchema]
+  ): Out = {
+    val oldValues = oldValue.map(_.productIterator.toSeq)
+    val names = schema.productElementNames.toSeq
+    compose(
+      schema.productIterator.zipWithIndex.map { (schemaAny, idx) =>
+        type Gen
+        val schema = schemaAny.asInstanceOf[FieldSchema[Gen]]
+        val fieldName = s"$prefix.${names(idx)}"
+        schema.renderer.draw(
+          schema,
+          fieldName,
+          oldValues.map(v => v(idx).asInstanceOf[Gen]),
+          errors.get(fieldName).getOrElse(Seq.empty)
+        )
+      }.toSeq*
+    )
+  }
+
   def validate[T[F[_]] <: Product](
       formData: T[[T] =>> T]
   )(using
