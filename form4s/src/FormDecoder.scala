@@ -187,25 +187,52 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       def decode(input: Form): Either[Seq[DecodingError], Seq[T]] =
         if (input.formData.isEmpty) Right(Seq.empty)
         else {
-          input.formData.head.stringValue match {
-            case Some("")                   => Right(Seq.empty)
-            case Some(v) if v.contains(",") =>
-              val results =
-                v.split(",")
-                  .map(str => decoder.decode(Form(FormField.Simple("", str))))
-              if (results.forall(_.isRight)) {
-                Right(results.toSeq.flatMap(_.toOption))
-              } else {
-                Left(results.collect { case Left(errs) => errs }.flatten.toSeq)
+          (input.formData.toSeq match {
+            case Seq(field) =>
+              field.stringValue match {
+                case Some("")                   => Some(Right(Seq.empty))
+                case Some(v) if v.contains(",") =>
+                  val results =
+                    v.split(",")
+                      .map(str =>
+                        decoder.decode(Form(FormField.Simple("", str)))
+                      )
+                  if (results.forall(_.isRight)) {
+                    Some(Right(results.toSeq.flatMap(_.toOption)))
+                  } else {
+                    Some(
+                      Left(
+                        results
+                          .collect { case Left(errs) => errs }
+                          .flatten
+                          .toSeq
+                      )
+                    )
+                  }
+                case _ => None
               }
-            case _ =>
-              val result =
-                input.formData.map(field => decoder.decode(Form(field)))
-              if (result.forall(_.isRight)) {
-                Right(result.flatMap(_.toOption))
-              } else {
-                Left(result.collect { case Left(errs) => errs }.flatten.toSeq)
+            case _ => None
+          }).getOrElse {
+            val forms = input.formData
+              .groupBy { field =>
+                field.name.split(".")(0).toIntOption.getOrElse(0)
               }
+              .mapValues(Form(_*))
+              .values
+              .toSeq
+
+            val result = forms match {
+              case Seq(form) =>
+                form.formData.map(field => decoder.decode(Form(field)))
+              case seq =>
+                seq.map(form => decoder.decode(form))
+            }
+
+            if (result.forall(_.isRight)) {
+              Right(result.flatMap(_.toOption))
+            } else {
+              Left(result.collect { case Left(errs) => errs }.flatten.toSeq)
+            }
           }
         }
 
@@ -225,7 +252,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
     if (key.contains(".")) {
       key.substring(key.indexOf(".") + 1)
     } else if (key.contains("[")) {
-      // TODO: perhaps we should parse those as well
+      // TODO: support field[] maybe
       key
     } else {
       key
