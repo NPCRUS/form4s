@@ -521,6 +521,60 @@ object FormDecoderTests extends TestSuite {
       assert(decoded == Right(Person("Alice", Seq.empty)))
     }
 
+    test("decode nested indexed subforms (multi-level)") {
+      case class Location(city: String) derives FormDecoder
+      case class Address(street: String, location: Location) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("addresses.0.street", "Main St"),
+        FormField.Simple("addresses.0.location.city", "NYC"),
+        FormField.Simple("addresses.1.street", "Beacon St"),
+        FormField.Simple("addresses.1.location.city", "Boston")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(
+        decoded == Right(
+          Person(
+            "Alice",
+            Seq(
+              Address("Main St", Location("NYC")),
+              Address("Beacon St", Location("Boston"))
+            )
+          )
+        )
+      )
+    }
+
+    test("decode indexed Seq[Option[String]] with missing values") {
+      case class Items(values: Seq[Option[String]]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("values.0", "a"),
+        FormField.Simple("values.1", ""),
+        FormField.Simple("values.2", "c")
+      )
+      val decoded = summon[FormDecoder[Items]].decode(form)
+      assert(decoded == Right(Items(Seq(Some("a"), None, Some("c")))))
+    }
+
+    test("decode nested Seq[Seq[String]] (2D array)") {
+      case class Matrix(rows: Seq[Seq[String]]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("rows.0.0", "a"),
+        FormField.Simple("rows.0.1", "b"),
+        FormField.Simple("rows.1.0", "c"),
+        FormField.Simple("rows.1.1", "d")
+      )
+      val decoded = summon[FormDecoder[Matrix]].decode(form)
+      assert(decoded == Right(Matrix(Seq(Seq("a", "b"), Seq("c", "d")))))
+    }
+
+    test("decode comma-separated Seq with empty elements") {
+      val form = Form(FormField.Simple("tags", "a,,b"))
+      val decoded = summon[FormDecoder[Seq[String]]].decode(form)
+      assert(decoded == Right(Seq("a", "", "b")))
+    }
+
     test("split returns error for non-enum sealed trait") {
       sealed trait Shape derives FormDecoder
       case class Circle(radius: Int) extends Shape derives FormDecoder

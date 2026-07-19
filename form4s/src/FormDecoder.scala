@@ -217,10 +217,11 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
               .groupBy { field =>
                 field.name.split("\\.")(0).toIntOption.getOrElse(0)
               }
+              .toSeq
+              .sortBy(_._1)
               .map { (_, fields) =>
                 Form(fields.map(f => f.name(clearPathFromName(f.name))))
               }
-              .toSeq
 
             val result = forms match {
               case Seq(form) if form.formData.map(_.name).toSet.size == 1 =>
