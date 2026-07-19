@@ -221,13 +221,27 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       .map(Left.apply)
       .orElse(decoderB.decode(input).map(Right.apply))
 
+  private def clearPathFromName(fieldName: String, key: String): String =
+    if (key.contains(".")) {
+      key.substring(key.indexOf(".") + 1)
+    } else if (key.contains("[")) {
+      // TODO: perhaps we should parse those as well
+      key
+    } else {
+      key
+    }
+
   override def join[T](caseClass: CaseClass[FormDecoder, T]): FormDecoder[T] =
     new FormDecoder[T] {
       def decode(input: Form): Either[Seq[DecodingError], T] = {
         val decodedFields = caseClass.parameters.map { param =>
           val fieldName = param.label
           val decoder = param.typeclass
-          val fields = input.formData.filter(_.name == fieldName)
+          val fields = input.formData
+            .filter(f =>
+              f.name == fieldName || f.name.startsWith(fieldName + ".")
+            )
+            .map(f => f.name(clearPathFromName(fieldName, f.name)))
 
           if (fields.nonEmpty) {
             decoder

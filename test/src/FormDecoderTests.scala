@@ -433,6 +433,18 @@ object FormDecoderTests extends TestSuite {
       )
     }
 
+    test("decode nested case class with dot-notation subform") {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, address: Address) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(decoded == Right(Person("Alice", Address("NYC", "Main St"))))
+    }
+
     test("split returns error for non-enum sealed trait") {
       sealed trait Shape derives FormDecoder
       case class Circle(radius: Int) extends Shape derives FormDecoder

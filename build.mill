@@ -1,3 +1,5 @@
+//| mill-version: 1.1.7
+
 package build
 
 import mill.*, scalalib.*, publish.*
@@ -7,12 +9,15 @@ object form4s extends ScalaModule with PublishModule {
   def publishVersion = "0.0.2"
 
   def pomSettings = PomSettings(
-    description = "Type-safe web form rendering, decoding, and validation for Scala 3",
+    description =
+      "Type-safe web form rendering, decoding, and validation for Scala 3",
     organization = "io.github.npcrus",
     url = "https://github.com/NPCRUS/form4s",
     licenses = Seq(License.MIT),
     versionControl = VersionControl.github("NPCRUS", "form4s"),
-    developers = Seq(Developer("npcrus", "Nikita Glushchenko", "https://github.com/NPCRUS"))
+    developers = Seq(
+      Developer("npcrus", "Nikita Glushchenko", "https://github.com/NPCRUS")
+    )
   )
 
   def mvnDeps = Seq(
