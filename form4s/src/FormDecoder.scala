@@ -215,14 +215,15 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
           }).getOrElse {
             val forms = input.formData
               .groupBy { field =>
-                field.name.split(".")(0).toIntOption.getOrElse(0)
+                field.name.split("\\.")(0).toIntOption.getOrElse(0)
               }
-              .mapValues(Form(_*))
-              .values
+              .map { (_, fields) =>
+                Form(fields.map(f => f.name(clearPathFromName(f.name))))
+              }
               .toSeq
 
             val result = forms match {
-              case Seq(form) =>
+              case Seq(form) if form.formData.map(_.name).toSet.size == 1 =>
                 form.formData.map(field => decoder.decode(Form(field)))
               case seq =>
                 seq.map(form => decoder.decode(form))
@@ -248,7 +249,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       .map(Left.apply)
       .orElse(decoderB.decode(input).map(Right.apply))
 
-  private def clearPathFromName(fieldName: String, key: String): String =
+  private def clearPathFromName(key: String): String =
     if (key.contains(".")) {
       key.substring(key.indexOf(".") + 1)
     } else if (key.contains("[")) {
@@ -268,7 +269,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
             .filter(f =>
               f.name == fieldName || f.name.startsWith(fieldName + ".")
             )
-            .map(f => f.name(clearPathFromName(fieldName, f.name)))
+            .map(f => f.name(clearPathFromName(f.name)))
 
           if (fields.nonEmpty) {
             decoder

@@ -445,6 +445,82 @@ object FormDecoderTests extends TestSuite {
       assert(decoded == Right(Person("Alice", Address("NYC", "Main St"))))
     }
 
+    test("decode indexed Seq[Address] with two subforms") {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("addresses.0.city", "NYC"),
+        FormField.Simple("addresses.0.street", "Main St"),
+        FormField.Simple("addresses.1.city", "Boston"),
+        FormField.Simple("addresses.1.street", "Beacon St")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(
+        decoded == Right(
+          Person(
+            "Alice",
+            Seq(Address("NYC", "Main St"), Address("Boston", "Beacon St"))
+          )
+        )
+      )
+    }
+
+    test("decode indexed Seq[Address] with single element") {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("addresses.0.city", "NYC"),
+        FormField.Simple("addresses.0.street", "Main St")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(decoded == Right(Person("Alice", Seq(Address("NYC", "Main St")))))
+    }
+
+    test("decode indexed Seq[String] via case class") {
+      case class Tags(tags: Seq[String]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("tags.0", "a"),
+        FormField.Simple("tags.1", "b"),
+        FormField.Simple("tags.2", "c")
+      )
+      val decoded = summon[FormDecoder[Tags]].decode(form)
+      assert(decoded == Right(Tags(Seq("a", "b", "c"))))
+    }
+
+    test("decode indexed Seq[Boolean] via case class") {
+      case class Flags(flags: Seq[Boolean]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("flags.0", "true"),
+        FormField.Simple("flags.1", "false")
+      )
+      val decoded = summon[FormDecoder[Flags]].decode(form)
+      assert(decoded == Right(Flags(Seq(true, false))))
+    }
+
+    test("decode indexed Seq[Address] reports errors from subforms") {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("addresses.0.city", "NYC"),
+        FormField.Simple("addresses.1.street", "Beacon St")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(decoded.isLeft)
+      val errors = decoded.left.getOrElse(Seq.empty)
+      assert(errors.exists(_.message == "Обязательное поле"))
+    }
+
+    test("decode empty indexed Seq via case class") {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      val form = Form(FormField.Simple("name", "Alice"))
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(decoded == Right(Person("Alice", Seq.empty)))
+    }
+
     test("split returns error for non-enum sealed trait") {
       sealed trait Shape derives FormDecoder
       case class Circle(radius: Int) extends Shape derives FormDecoder
