@@ -39,6 +39,10 @@ trait FormV2[Elem] {
         label: String,
         form: F[FormSchema]
     ) extends FormSchema[F[FormSchema]]
+    case RepeatedSubForm[F[B[_]] <: Product](
+        label: String,
+        form: F[FormSchema]
+    ) extends FormSchema[Seq[F[FormSchema]]]
   }
 
   case class FieldSchema[T](
@@ -51,6 +55,15 @@ trait FormV2[Elem] {
   )
 
   def subFormContainer(label: String): Elem
+
+  def addBtn: Elem
+  def deleteBtn: Elem
+  def listOfSubformsContainer(
+      label: String,
+      fieldName: String,
+      items: Seq[Elem],
+      templateItem: Elem
+  ): Elem
 
   def draw[T[F[_]] <: Product](
       oldValue: Option[T[[T] =>> T]],
@@ -75,6 +88,20 @@ trait FormV2[Elem] {
           case FormSchema.SubForm(label, form) =>
             amend(subFormContainer(label))(
               draw(None, Map.empty)(using form)
+            )
+          case FormSchema.RepeatedSubForm(label, form) =>
+            val count =
+              oldValues.map(v => v(idx).asInstanceOf[Seq[?]].size).getOrElse(0)
+            val existing = (0 until count).map { _ =>
+              amend(base)(draw(None, Map.empty)(using form), deleteBtn)
+            }
+            val tpl =
+              amend(base)(draw(None, Map.empty)(using form), deleteBtn)
+            listOfSubformsContainer(
+              label,
+              names(idx),
+              existing,
+              tpl
             )
       }.toSeq*
     )

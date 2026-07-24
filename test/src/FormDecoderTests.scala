@@ -447,7 +447,8 @@ object FormDecoderTests extends TestSuite {
 
     test("decode indexed Seq[Address] with two subforms") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.city", "NYC"),
@@ -468,7 +469,8 @@ object FormDecoderTests extends TestSuite {
 
     test("decode indexed Seq[Address] with single element") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.city", "NYC"),
@@ -501,7 +503,8 @@ object FormDecoderTests extends TestSuite {
 
     test("decode indexed Seq[Address] reports errors from subforms") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.city", "NYC"),
@@ -515,7 +518,8 @@ object FormDecoderTests extends TestSuite {
 
     test("decode empty indexed Seq via case class") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(FormField.Simple("name", "Alice"))
       val decoded = summon[FormDecoder[Person]].decode(form)
       assert(decoded == Right(Person("Alice", Seq.empty)))
@@ -524,7 +528,8 @@ object FormDecoderTests extends TestSuite {
     test("decode nested indexed subforms (multi-level)") {
       case class Location(city: String) derives FormDecoder
       case class Address(street: String, location: Location) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.street", "Main St"),

@@ -21,6 +21,43 @@ object DemoHtmlForm extends FormV2[Element] {
       )
     )
 
+  def addBtn: Element =
+    button(
+      `type` := "button",
+      `class` := "mt-2 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200",
+      custom("onclick") := "form4s.addItem(this)",
+      text("+ Добавить")
+    )
+
+  def deleteBtn: Element =
+    button(
+      `type` := "button",
+      `class` := "text-red-600 hover:text-red-900 ml-2",
+      custom("onclick") := "form4s.deleteItem(this)",
+      text("✕")
+    )
+
+  def listOfSubformsContainer(
+      fieldLabel: String,
+      fieldName: String,
+      items: Seq[Element],
+      templateItem: Element
+  ): Element =
+    div(
+      data("repeated") := fieldName,
+      `class` := "mb-4 border p-4 rounded-lg bg-gray-50",
+      label(
+        `class` := "block text-md font-semibold text-gray-700 mb-2",
+        fieldLabel
+      ),
+      items.map(i => div(data("repeated-item") := "", i)),
+      template(div(data("repeated-item") := "", templateItem)),
+      addBtn,
+      script.inlineJs(
+        "(function(){if(window.form4s)return;window.form4s={addItem:function(b){var c=b.closest('[data-repeated]');var t=c.querySelector('template');t.before(t.content.cloneNode(true))},deleteItem:function(b){var i=b.closest('[data-repeated-item]');if(i)i.remove()}}})()"
+      )
+    )
+
   val inputCls: String =
     "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
   val inputErrCls: String =

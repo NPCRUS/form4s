@@ -58,10 +58,10 @@ object E2ETests extends TestSuite {
           .fold(
             incomplete => {
               lastDecodeResult.set(Left(incomplete.errors))
-              val errorDivs = incomplete.errors.toSeq.flatMap {
-                case (field, msgs) =>
+              val errorDivs =
+                incomplete.errors.toSeq.flatMap { case (field, msgs) =>
                   msgs.map(m => p(`class` := "form-error", text(s"$field: $m")))
-              }
+                }
               Response.html(
                 html(
                   head(meta(charset := "utf-8")),
@@ -71,7 +71,10 @@ object E2ETests extends TestSuite {
                       method := "post",
                       action := "/",
                       HtmlForm
-                        .draw[TestUserForm](incomplete.oldForm, incomplete.errors),
+                        .draw[TestUserForm](
+                          incomplete.oldForm,
+                          incomplete.errors
+                        ),
                       button(`type` := "submit", text("Submit"))
                     )
                   )

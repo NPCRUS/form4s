@@ -12,9 +12,15 @@ case class Address[F[_]](
     street: F[String]
 )
 
+case class Document[F[_]](
+    typ: F[String],
+    number: F[String]
+)
+
 case class RegistrationForm[F[_]](
     username: F[String],
-    address: F[Address[F]]
+    address: F[Address[F]],
+    documents: F[Seq[Document[F]]]
 )
 
 object DemoApp extends ZIOAppDefault {
@@ -39,6 +45,25 @@ object DemoApp extends ZIOAppDefault {
     )
   )
 
+  private val documentSchema = Document(
+    typ = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Тип документа",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Например, паспорт",
+        typeAttr = "text"
+      )
+    ),
+    number = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Номер",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Введите номер",
+        typeAttr = "text"
+      )
+    )
+  )
+
   given RegistrationForm[DemoHtmlForm.FormSchema] = RegistrationForm(
     username = DemoHtmlForm.FormSchema.Field(
       DemoHtmlForm.FieldSchema(
@@ -53,6 +78,10 @@ object DemoApp extends ZIOAppDefault {
     address = DemoHtmlForm.FormSchema.SubForm(
       label = "Адрес",
       form = addressSchema
+    ),
+    documents = DemoHtmlForm.FormSchema.RepeatedSubForm(
+      label = "Документы",
+      form = documentSchema
     )
   )
 
@@ -137,7 +166,17 @@ object DemoApp extends ZIOAppDefault {
                 dd(
                   `class` := "text-sm text-gray-900",
                   text(data.address.street)
-                )
+                ),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
+                  text("Документы")
+                ),
+                data.documents.zipWithIndex.map { (doc, i) =>
+                  dd(
+                    `class` := "text-sm text-gray-900",
+                    text(s"${i + 1}. ${doc.typ} — ${doc.number}")
+                  )
+                }
               ),
               a(
                 href := "/",
