@@ -9,6 +9,22 @@ case class AccountForm[F[_]](
     age: F[Int]
 )
 
+case class AddressF[F[_]](
+    city: F[String],
+    street: F[String]
+)
+
+case class DocF[F[_]](
+    typ: F[String],
+    number: F[String]
+)
+
+case class RegForm[F[_]](
+    login: F[String],
+    address: F[AddressF[F]],
+    docs: F[Seq[DocF[F]]]
+)
+
 object DecodeAndValidateTests extends TestSuite {
   type AccountFormData = AccountForm[[T] =>> T]
 
@@ -29,6 +45,68 @@ object DecodeAndValidateTests extends TestSuite {
         placeholderAttr = "Enter age",
         typeAttr = "number"
       )
+    )
+  )
+
+  given AddressF[HtmlForm.FormSchema] = AddressF(
+    city = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "City",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "city",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
+    ),
+    street = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Street",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "street",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
+    )
+  )
+
+  given DocF[HtmlForm.FormSchema] = DocF(
+    typ = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Type",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "type",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
+    ),
+    number = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Number",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "number",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
+    )
+  )
+
+  given RegForm[HtmlForm.FormSchema] = RegForm(
+    login = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Login",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "Enter login",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
+    ),
+    address = HtmlForm.FormSchema.SubForm(
+      "Address",
+      summon[AddressF[HtmlForm.FormSchema]]
+    ),
+    docs = HtmlForm.FormSchema.RepeatedSubForm(
+      "Docs",
+      summon[DocF[HtmlForm.FormSchema]]
     )
   )
 
@@ -75,6 +153,150 @@ object DecodeAndValidateTests extends TestSuite {
       val incomplete = result.swap.toOption.get
       assert(
         incomplete.errors("age") == Seq("Невозможно преобразовать в число")
+      )
+      assert(incomplete.oldForm.isEmpty)
+    }
+
+    test("valid subform data decodes and validates") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isRight)
+      val reg = result.toOption.get
+      assert(reg.login == "alice")
+      assert(reg.address.city == "NYC")
+      assert(reg.address.street == "Main St")
+      assert(reg.docs.isEmpty)
+    }
+
+    test("subform validation failure produces dot-notation error key") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", ""),
+        FormField.Simple("address.street", "Main St")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("address.city") == Seq(
+          "Поле должно быть заполнено"
+        )
+      )
+      assert(!incomplete.errors.contains("address.street"))
+      assert(!incomplete.errors.contains("login"))
+    }
+
+    test("subform old form preserved on validation failure") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", ""),
+        FormField.Simple("address.street", "Main St")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      val incomplete = result.swap.toOption.get
+      assert(incomplete.oldForm.isDefined)
+      val old = incomplete.oldForm.get
+      assert(old.login == "alice")
+      assert(old.address.city == "")
+      assert(old.address.street == "Main St")
+    }
+
+    test("valid repeated subform data decodes and validates") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St"),
+        FormField.Simple("docs.0.typ", "passport"),
+        FormField.Simple("docs.0.number", "12345"),
+        FormField.Simple("docs.1.typ", "visa"),
+        FormField.Simple("docs.1.number", "67890")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isRight)
+      val reg = result.toOption.get
+      assert(reg.login == "alice")
+      assert(reg.docs.length == 2)
+      assert(reg.docs(0).typ == "passport")
+      assert(reg.docs(0).number == "12345")
+      assert(reg.docs(1).typ == "visa")
+      assert(reg.docs(1).number == "67890")
+    }
+
+    test("repeated subform validation failure produces indexed error key") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St"),
+        FormField.Simple("docs.0.typ", "passport"),
+        FormField.Simple("docs.0.number", ""),
+        FormField.Simple("docs.1.typ", "visa"),
+        FormField.Simple("docs.1.number", "67890")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("docs.0.number") == Seq(
+          "Поле должно быть заполнено"
+        )
+      )
+      assert(!incomplete.errors.contains("docs.0.typ"))
+      assert(!incomplete.errors.contains("docs.1.number"))
+      assert(!incomplete.errors.contains("login"))
+    }
+
+    test("repeated subform old form preserved on validation failure") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St"),
+        FormField.Simple("docs.0.typ", "passport"),
+        FormField.Simple("docs.0.number", ""),
+        FormField.Simple("docs.1.typ", "visa"),
+        FormField.Simple("docs.1.number", "67890")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      val incomplete = result.swap.toOption.get
+      assert(incomplete.oldForm.isDefined)
+      val old = incomplete.oldForm.get
+      assert(old.login == "alice")
+      assert(old.docs.length == 2)
+      assert(old.docs(0).typ == "passport")
+      assert(old.docs(0).number == "")
+      assert(old.docs(1).typ == "visa")
+      assert(old.docs(1).number == "67890")
+    }
+
+    test("decode failure in subform produces correct error") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("address.street") == Seq("Обязательное поле")
+      )
+      assert(incomplete.oldForm.isEmpty)
+    }
+
+    test("decode failure in repeated subform produces correct error") {
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St"),
+        FormField.Simple("docs.0.number", "12345")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("docs.0.typ") == Seq("Обязательное поле")
       )
       assert(incomplete.oldForm.isEmpty)
     }
