@@ -196,23 +196,23 @@ object DemoApp extends ZIOAppDefault {
         Map.empty
       )
       renderPage(form)
+    },
+    Method.POST / "" -> handler { (req: Request) =>
+      req.body.asURLEncodedForm.flatMap { fd =>
+        DemoHtmlForm
+          .decodeAndValidate[RegistrationForm](fd)
+          .fold(
+            incomplete =>
+              renderPage(
+                DemoHtmlForm.draw[RegistrationForm](
+                  incomplete.oldForm,
+                  incomplete.errors
+                )
+              ),
+            renderSuccess
+          )
+      }
     }
-    // Method.POST / "" -> handler { (req: Request) =>
-    //   req.body.asURLEncodedForm.flatMap { fd =>
-    //     DemoHtmlForm
-    //       .decodeAndValidate[RegistrationForm](fd)
-    //       .fold(
-    //         incomplete =>
-    //           renderPage(
-    //             DemoHtmlForm.draw[RegistrationForm](
-    //               incomplete.oldForm,
-    //               incomplete.errors
-    //             )
-    //           ),
-    //         renderSuccess
-    //       )
-    //   }
-    // }
   )
 
   def run: ZIO[Any, Throwable, Nothing] =

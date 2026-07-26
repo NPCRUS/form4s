@@ -8,11 +8,20 @@ trait FormV2[Elem] {
   def base: Elem
   def amend(p: Elem)(inside: Elem*): Elem
   def render(in: Elem): String
+  def subFormContainer(label: String): Elem
+  def addBtn: Elem
+  def deleteBtn: Elem
+  def listOfSubformsContainer(
+      label: String,
+      fieldName: Cursor,
+      items: Seq[Elem],
+      templateItem: Elem
+  ): Elem
 
   trait Renderable[T] { that =>
     def draw(
         schema: FieldSchema[T],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[T],
         errors: Seq[String]
     ): Elem
@@ -20,7 +29,7 @@ trait FormV2[Elem] {
     def optional: Renderable[Option[T]] = new Renderable[Option[T]] {
       def draw(
           schema: FieldSchema[Option[T]],
-          fieldName: String,
+          fieldName: Cursor,
           oldValue: Option[Option[T]],
           errors: Seq[String]
       ): Elem =
@@ -54,20 +63,19 @@ trait FormV2[Elem] {
       options: Seq[String] = Seq.empty
   )
 
-  def subFormContainer(label: String): Elem
-
-  def addBtn: Elem
-  def deleteBtn: Elem
-  def listOfSubformsContainer(
-      label: String,
-      fieldName: String,
-      items: Seq[Elem],
-      templateItem: Elem
-  ): Elem
-
   def draw[T[F[_]] <: Product](
       oldValue: Option[T[[T] =>> T]],
       errors: Map[String, Seq[String]]
+  )(using
+      schema: T[FormSchema]
+  ): Elem = {
+    draw(oldValue, errors, Cursor.root)
+  }
+
+  private def draw[T[F[_]] <: Product](
+      oldValue: Option[T[[T] =>> T]],
+      errors: Map[String, Seq[String]],
+      cursor: Cursor
   )(using
       schema: T[FormSchema]
   ): Elem = {
@@ -77,29 +85,37 @@ trait FormV2[Elem] {
       schema.productIterator.zipWithIndex.map { (schemaAny, idx) =>
         type Gen
         val schema = schemaAny.asInstanceOf[FormSchema[Gen]]
+        val name = names(idx)
         schema match
           case FormSchema.Field(schema) =>
             schema.renderer.draw(
               schema,
-              names(idx),
+              cursor.down(name),
               oldValues.map(v => v(idx).asInstanceOf[Gen]),
-              errors.get(names(idx)).getOrElse(Seq.empty)
+              errors.get(name).getOrElse(Seq.empty)
             )
           case FormSchema.SubForm(label, form) =>
             amend(subFormContainer(label))(
-              draw(None, Map.empty)(using form)
+              draw(None, Map.empty, cursor.down(name))(using form)
             )
           case FormSchema.RepeatedSubForm(label, form) =>
+            val subCursor = cursor.down(name)
             val count =
               oldValues.map(v => v(idx).asInstanceOf[Seq[?]].size).getOrElse(0)
-            val existing = (0 until count).map { _ =>
-              amend(base)(draw(None, Map.empty)(using form), deleteBtn)
+            val existing = (0 until count).map { idx =>
+              amend(base)(
+                draw(None, Map.empty, cursor.at(idx))(using form),
+                deleteBtn
+              )
             }
             val tpl =
-              amend(base)(draw(None, Map.empty)(using form), deleteBtn)
+              amend(base)(
+                draw(None, Map.empty, cursor.down(name).at(0))(using form),
+                deleteBtn
+              )
             listOfSubformsContainer(
               label,
-              names(idx),
+              cursor.down(name),
               existing,
               tpl
             )
@@ -107,28 +123,44 @@ trait FormV2[Elem] {
     )
   }
 
+  private def validateUnsafe[T[F[_]] <: Product](
+      data: Any,
+      schema: T[FormSchema]
+  ) =
+    validate(data.asInstanceOf[T[[T] =>> T]])(using schema)
+
   def validate[T[F[_]] <: Product](
       formData: T[[T] =>> T]
   )(using
-      schema: T[FieldSchema]
+      schema: T[FormSchema]
   ): ZIO[Any, Nothing, Map[String, Seq[String]]] = {
     val schemas = schema.productIterator.toSeq
     val names = formData.productElementNames.toSeq
     ZIO
       .collectAllPar(formData.productIterator.zipWithIndex.map { (value, idx) =>
         type Gen
-        val schema = schemas(idx).asInstanceOf[FieldSchema[Gen]]
-        schema.validator.validate(value.asInstanceOf[Gen]).map { errors =>
-          (names(idx), errors)
-        }
+        val schema = schemas(idx).asInstanceOf[FormSchema[Gen]]
+        schema match
+          case FormSchema.Field(schema) =>
+            schema.validator.validate(value.asInstanceOf[Gen]).map { errors =>
+              Seq((names(idx), errors)).toMap
+            }
+          case FormSchema.SubForm(label, schema) =>
+            validateUnsafe(value, schema)
+          case FormSchema.RepeatedSubForm(label, schema) =>
+            ZIO
+              .collectAllPar(value.asInstanceOf[Seq[Any]].map { v =>
+                validateUnsafe(v, schema)
+              })
+              .map(_.reduce(_ ++ _))
       }.toSeq)
-      .map(_.filter(_._2.nonEmpty).toMap)
+      .map(_.reduce(_ ++ _).filter((_, error) => error.nonEmpty))
   }
 
   def decodeAndValidate[T[F[_]] <: Product](
       input: zio.http.Form
   )(using
-      schema: T[FieldSchema],
+      schema: T[FormSchema],
       decoder: FormDecoder[T[[T] =>> T]]
   ): ZIO[Any, IncompleteForm[T[[T] =>> T]], T[[T] =>> T]] =
     decoder.decode(input) match {

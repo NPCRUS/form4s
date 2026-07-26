@@ -5,6 +5,7 @@ import form4s.FormV2
 import java.util.UUID
 import zio.http.template2.Dom.Element
 import zio.http.template2.Dom.Fragment
+import form4s.Cursor
 
 object DemoHtmlForm extends FormV2[Element] {
   def base: Element = div
@@ -39,12 +40,12 @@ object DemoHtmlForm extends FormV2[Element] {
 
   def listOfSubformsContainer(
       fieldLabel: String,
-      fieldName: String,
+      fieldName: Cursor,
       items: Seq[Element],
       templateItem: Element
   ): Element =
     div(
-      data("repeated") := fieldName,
+      data("repeated") := fieldName.build,
       `class` := "mb-4 border p-4 rounded-lg bg-gray-50",
       label(
         `class` := "block text-md font-semibold text-gray-700 mb-2",
@@ -68,15 +69,19 @@ object DemoHtmlForm extends FormV2[Element] {
   val stringRenderable: Renderable[String] = new Renderable[String] {
     def draw(
         schema: FieldSchema[String],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[String],
         errors: Seq[String]
     ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label)
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
@@ -89,15 +94,19 @@ object DemoHtmlForm extends FormV2[Element] {
   val intRenderable: Renderable[Int] = new Renderable[Int] {
     def draw(
         schema: FieldSchema[Int],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[Int],
         errors: Seq[String]
     ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label)
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
@@ -110,15 +119,19 @@ object DemoHtmlForm extends FormV2[Element] {
   val longRenderable: Renderable[Long] = new Renderable[Long] {
     def draw(
         schema: FieldSchema[Long],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[Long],
         errors: Seq[String]
     ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label)
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
@@ -131,15 +144,19 @@ object DemoHtmlForm extends FormV2[Element] {
   val uuidRenderable: Renderable[UUID] = new Renderable[UUID] {
     def draw(
         schema: FieldSchema[UUID],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[UUID],
         errors: Seq[String]
     ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label)
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
@@ -152,20 +169,20 @@ object DemoHtmlForm extends FormV2[Element] {
   val boolRenderable: Renderable[Boolean] = new Renderable[Boolean] {
     def draw(
         schema: FieldSchema[Boolean],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[Boolean],
         errors: Seq[String]
     ): Element =
       div(
         `class` := "mb-4 flex items-center gap-2",
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := "checkbox",
           `class` := "h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500",
           oldValue.filter(identity).map(_ => checked)
         ),
         label(
-          `for` := fieldName,
+          `for` := fieldName.build,
           `class` := "text-sm text-gray-700",
           text(schema.label)
         ),
@@ -177,16 +194,20 @@ object DemoHtmlForm extends FormV2[Element] {
     new Renderable[T] {
       def draw(
           schema: FieldSchema[T],
-          fieldName: String,
+          fieldName: Cursor,
           oldValue: Option[T],
           errors: Seq[String]
       ): Element = {
         val oldStr = oldValue.map(show)
         div(
           `class` := "mb-4",
-          label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+          label(
+            `for` := fieldName.build,
+            `class` := labelCls,
+            text(schema.label)
+          ),
           select(
-            name := fieldName,
+            name := fieldName.build,
             `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
             option(value := "", text("-- Выберите --")),
             schema.options.map { opt =>
