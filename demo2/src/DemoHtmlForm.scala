@@ -46,6 +46,7 @@ object DemoHtmlForm extends FormV2[Element] {
   ): Element =
     div(
       data("repeated") := fieldName.build,
+      data("next-index") := items.size.toString,
       `class` := "mb-4 border p-4 rounded-lg bg-gray-50",
       label(
         `class` := "block text-md font-semibold text-gray-700 mb-2",
@@ -55,7 +56,7 @@ object DemoHtmlForm extends FormV2[Element] {
       template(div(data("repeated-item") := "", templateItem)),
       addBtn,
       script.inlineJs(
-        "(function(){if(window.form4s)return;window.form4s={addItem:function(b){var c=b.closest('[data-repeated]');var t=c.querySelector('template');t.before(t.content.cloneNode(true))},deleteItem:function(b){var i=b.closest('[data-repeated-item]');if(i)i.remove()}}})()"
+        "(function(){if(window.form4s)return;window.form4s={addItem:function(b){var c=b.closest('[data-repeated]');var t=c.querySelector('template');var n=parseInt(c.getAttribute('data-next-index'));c.setAttribute('data-next-index',n+1);var f=t.content.cloneNode(true);var re=/\\.0\\./g;var rp='.'+n+'.';f.querySelectorAll('[name]').forEach(function(e){e.name=e.name.replace(re,rp)});f.querySelectorAll('[for]').forEach(function(e){e.setAttribute('for',e.getAttribute('for').replace(re,rp))});f.querySelectorAll('[id]').forEach(function(e){e.id=e.id.replace(re,rp)});t.before(f)},deleteItem:function(b){var i=b.closest('[data-repeated-item]');if(i)i.remove()}}})()"
       )
     )
 

@@ -102,20 +102,20 @@ trait FormV2[Elem] {
             val subCursor = cursor.down(name)
             val count =
               oldValues.map(v => v(idx).asInstanceOf[Seq[?]].size).getOrElse(0)
-            val existing = (0 until count).map { idx =>
+            val existing = (0 until count).map { i =>
               amend(base)(
-                draw(None, Map.empty, cursor.at(idx))(using form),
+                draw(None, Map.empty, subCursor.at(i))(using form),
                 deleteBtn
               )
             }
             val tpl =
               amend(base)(
-                draw(None, Map.empty, cursor.down(name).at(0))(using form),
+                draw(None, Map.empty, subCursor.at(0))(using form),
                 deleteBtn
               )
             listOfSubformsContainer(
               label,
-              cursor.down(name),
+              subCursor,
               existing,
               tpl
             )
