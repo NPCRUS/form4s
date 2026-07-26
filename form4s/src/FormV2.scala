@@ -72,6 +72,17 @@ trait FormV2[Elem] {
     draw(oldValue, errors, Cursor.root)
   }
 
+  private def drawUnsafe[T[F[_]] <: Product](
+      oldValue: Option[Any],
+      errors: Map[String, Seq[String]],
+      cursor: Cursor
+  )(using
+      schema: T[FormSchema]
+  ): Elem =
+    draw[T](oldValue.map(_.asInstanceOf[T[[T] =>> T]]), errors, cursor)(using
+      schema
+    )
+
   private def draw[T[F[_]] <: Product](
       oldValue: Option[T[[T] =>> T]],
       errors: Map[String, Seq[String]],
@@ -86,25 +97,37 @@ trait FormV2[Elem] {
         type Gen
         val schema = schemaAny.asInstanceOf[FormSchema[Gen]]
         val name = names(idx)
+        val subCursor = cursor.down(name)
         schema match
           case FormSchema.Field(schema) =>
             schema.renderer.draw(
               schema,
-              cursor.down(name),
+              subCursor,
               oldValues.map(v => v(idx).asInstanceOf[Gen]),
-              errors.get(name).getOrElse(Seq.empty)
+              errors.get(subCursor.build).getOrElse(Seq.empty)
             )
           case FormSchema.SubForm(label, form) =>
             amend(subFormContainer(label))(
-              draw(None, Map.empty, cursor.down(name))(using form)
+              drawUnsafe(
+                oldValues.map(v => v(idx)),
+                errors,
+                subCursor
+              )(using form)
             )
           case FormSchema.RepeatedSubForm(label, form) =>
-            val subCursor = cursor.down(name)
+            val oldValuesForSeq =
+              oldValues.map(v => v(idx).asInstanceOf[Seq[Any]])
             val count =
-              oldValues.map(v => v(idx).asInstanceOf[Seq[?]].size).getOrElse(0)
+              oldValuesForSeq.map(_.length).getOrElse(0)
             val existing = (0 until count).map { i =>
               amend(base)(
-                draw(None, Map.empty, subCursor.at(i))(using form),
+                drawUnsafe(
+                  oldValuesForSeq.map(v => v(i)),
+                  errors,
+                  subCursor.at(i)
+                )(using
+                  form
+                ),
                 deleteBtn
               )
             }
@@ -125,37 +148,53 @@ trait FormV2[Elem] {
 
   private def validateUnsafe[T[F[_]] <: Product](
       data: Any,
-      schema: T[FormSchema]
+      schema: T[FormSchema],
+      cursor: Cursor
   ) =
-    validate(data.asInstanceOf[T[[T] =>> T]])(using schema)
+    validate(data.asInstanceOf[T[[T] =>> T]], cursor)(using schema)
 
-  def validate[T[F[_]] <: Product](
-      formData: T[[T] =>> T]
+  private def validate[T[F[_]] <: Product](
+      formData: T[[T] =>> T],
+      cursor: Cursor
   )(using
       schema: T[FormSchema]
-  ): ZIO[Any, Nothing, Map[String, Seq[String]]] = {
+  ): ZIO[Any, Nothing, Map[Cursor, Seq[String]]] = {
     val schemas = schema.productIterator.toSeq
     val names = formData.productElementNames.toSeq
     ZIO
       .collectAllPar(formData.productIterator.zipWithIndex.map { (value, idx) =>
         type Gen
         val schema = schemas(idx).asInstanceOf[FormSchema[Gen]]
+        val name = names(idx)
         schema match
           case FormSchema.Field(schema) =>
             schema.validator.validate(value.asInstanceOf[Gen]).map { errors =>
-              Seq((names(idx), errors)).toMap
+              Seq((cursor.down(name), errors)).toMap
             }
           case FormSchema.SubForm(label, schema) =>
-            validateUnsafe(value, schema)
+            validateUnsafe(value, schema, cursor.down(name))
           case FormSchema.RepeatedSubForm(label, schema) =>
+            val subCursor = cursor.down(name)
             ZIO
-              .collectAllPar(value.asInstanceOf[Seq[Any]].map { v =>
-                validateUnsafe(v, schema)
+              .collectAllPar(value.asInstanceOf[Seq[Any]].zipWithIndex.map {
+                (v, i) =>
+                  validateUnsafe(v, schema, subCursor.at(i))
               })
-              .map(_.reduce(_ ++ _))
+              .map(_.foldLeft(Map.empty[Cursor, Seq[String]])(_ ++ _))
       }.toSeq)
-      .map(_.reduce(_ ++ _).filter((_, error) => error.nonEmpty))
+      .map(
+        _.foldLeft(Map.empty[Cursor, Seq[String]])(_ ++ _)
+          .filter((_, error) => error.nonEmpty)
+      )
   }
+
+  def validate[T[F[_]] <: Product](
+      formData: T[[T] =>> T]
+  )(using
+      schema: T[FormSchema]
+  ): ZIO[Any, Nothing, Map[String, Seq[String]]] =
+    validate(formData, Cursor.root)(using schema)
+      .map(_.map((c, e) => (c.build, e)))
 
   def decodeAndValidate[T[F[_]] <: Product](
       input: zio.http.Form

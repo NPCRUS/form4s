@@ -32,7 +32,8 @@ object DemoApp extends ZIOAppDefault {
         label = "Город",
         renderer = DemoHtmlForm.stringRenderable,
         placeholderAttr = "Введите город",
-        typeAttr = "text"
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
       )
     ),
     street = DemoHtmlForm.FormSchema.Field(
@@ -40,7 +41,8 @@ object DemoApp extends ZIOAppDefault {
         label = "Улица",
         renderer = DemoHtmlForm.stringRenderable,
         placeholderAttr = "Введите улицу",
-        typeAttr = "text"
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
       )
     )
   )
@@ -51,7 +53,8 @@ object DemoApp extends ZIOAppDefault {
         label = "Тип документа",
         renderer = DemoHtmlForm.stringRenderable,
         placeholderAttr = "Например, паспорт",
-        typeAttr = "text"
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
       )
     ),
     number = DemoHtmlForm.FormSchema.Field(
@@ -59,7 +62,8 @@ object DemoApp extends ZIOAppDefault {
         label = "Номер",
         renderer = DemoHtmlForm.stringRenderable,
         placeholderAttr = "Введите номер",
-        typeAttr = "text"
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
       )
     )
   )

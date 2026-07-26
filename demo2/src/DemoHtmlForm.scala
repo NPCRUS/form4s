@@ -73,7 +73,7 @@ object DemoHtmlForm extends FormV2[Element] {
         fieldName: Cursor,
         oldValue: Option[String],
         errors: Seq[String]
-    ): Element =
+    ): Element = {
       div(
         `class` := "mb-4",
         label(
@@ -90,6 +90,7 @@ object DemoHtmlForm extends FormV2[Element] {
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
+    }
   }
 
   val intRenderable: Renderable[Int] = new Renderable[Int] {
