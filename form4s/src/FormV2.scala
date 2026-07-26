@@ -125,9 +125,7 @@ trait FormV2[Elem] {
                   oldValuesForSeq.map(v => v(i)),
                   errors,
                   subCursor.at(i)
-                )(using
-                  form
-                ),
+                )(using form),
                 deleteBtn
               )
             }

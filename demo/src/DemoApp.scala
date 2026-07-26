@@ -5,6 +5,7 @@ import zio.http.*
 import zio.http.template2.{form as formTag, *}
 import form4s.*
 import java.util.UUID
+import demo.DemoHtmlForm
 
 enum Role:
   case Student, Developer, Designer, Manager, Other
@@ -23,6 +24,11 @@ case class Address[F[_]](
     street: F[String]
 )
 
+case class Document[F[_]](
+    typ: F[String],
+    number: F[String]
+)
+
 case class RegistrationForm[F[_]](
     username: F[String],
     email: F[String],
@@ -32,88 +38,135 @@ case class RegistrationForm[F[_]](
     role: F[Role],
     bio: F[Option[String]],
     agree: F[Boolean],
-    address: F[Address[F]]
+    address: F[Address[F]],
+    documents: F[Seq[Document[F]]]
 )
 
 object DemoApp extends ZIOAppDefault {
   type RegistrationFormData = RegistrationForm[[T] =>> T]
 
   private val addressSchema = Address(
-    city = DemoHtmlForm.FieldSchema(
-      label = "Город",
-      renderer = DemoHtmlForm.stringRenderable,
-      placeholderAttr = "Введите город",
-      typeAttr = "text"
+    city = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Город",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Введите город",
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
+      )
     ),
-    street = DemoHtmlForm.FieldSchema(
-      label = "Улица",
-      renderer = DemoHtmlForm.stringRenderable,
-      placeholderAttr = "Введите улицу",
-      typeAttr = "text"
+    street = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Улица",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Введите улицу",
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
+      )
     )
   )
 
-  given RegistrationForm[DemoHtmlForm.FieldSchema] = RegistrationForm(
-    username = DemoHtmlForm.FieldSchema(
-      label = "Имя пользователя",
-      renderer = DemoHtmlForm.stringRenderable,
-      placeholderAttr = "Введите имя",
-      typeAttr = "text",
-      validator =
-        Validator.compose(Validator.nonEmpty, Validator.minLength(3)).toZIO
+  private val documentSchema = Document(
+    typ = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Тип документа",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Например, паспорт",
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
+      )
     ),
-    email = DemoHtmlForm.FieldSchema(
-      label = "Email",
-      renderer = DemoHtmlForm.stringRenderable,
-      placeholderAttr = "example@mail.com",
-      typeAttr = "email",
-      validator = Validator.compose(Validator.nonEmpty, Validator.isEmail).toZIO
+    number = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Номер",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Введите номер",
+        typeAttr = "text",
+        validator = Validator.minLength(3).toZIO
+      )
+    )
+  )
+
+  given RegistrationForm[DemoHtmlForm.FormSchema] = RegistrationForm(
+    username = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Имя пользователя",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "Введите имя",
+        typeAttr = "text",
+        validator =
+          Validator.compose(Validator.nonEmpty, Validator.minLength(3)).toZIO
+      )
     ),
-    age = DemoHtmlForm.FieldSchema(
-      label = "Возраст",
-      renderer = DemoHtmlForm.intRenderable,
-      placeholderAttr = "Введите возраст",
-      typeAttr = "number",
-      validator = Validator.compose(Validator.min(1), Validator.max(150)).toZIO
+    email = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Email",
+        renderer = DemoHtmlForm.stringRenderable,
+        placeholderAttr = "example@mail.com",
+        typeAttr = "email",
+        validator =
+          Validator.compose(Validator.nonEmpty, Validator.isEmail).toZIO
+      )
     ),
-    score = DemoHtmlForm.FieldSchema(
-      label = "Баллы",
-      renderer = DemoHtmlForm.longRenderable,
-      placeholderAttr = "Введите баллы",
-      typeAttr = "number"
+    age = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Возраст",
+        renderer = DemoHtmlForm.intRenderable,
+        placeholderAttr = "Введите возраст",
+        typeAttr = "number",
+        validator =
+          Validator.compose(Validator.min(1), Validator.max(150)).toZIO
+      )
     ),
-    referralId = DemoHtmlForm.FieldSchema(
-      label = "Реферальный ID",
-      renderer = DemoHtmlForm.uuidRenderable,
-      placeholderAttr = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-      typeAttr = "text"
+    score = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Баллы",
+        renderer = DemoHtmlForm.longRenderable,
+        placeholderAttr = "Введите баллы",
+        typeAttr = "number"
+      )
     ),
-    role = DemoHtmlForm.FieldSchema(
-      label = "Роль",
-      renderer = DemoHtmlForm.selectRenderable[Role](_.toString),
-      placeholderAttr = "",
-      typeAttr = "select",
-      options = Role.values.map(_.toString).toSeq
+    referralId = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Реферальный ID",
+        renderer = DemoHtmlForm.uuidRenderable,
+        placeholderAttr = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        typeAttr = "text"
+      )
     ),
-    bio = DemoHtmlForm.FieldSchema(
-      label = "О себе",
-      renderer = DemoHtmlForm.stringRenderable.optional,
-      placeholderAttr = "Расскажите о себе",
-      typeAttr = "text"
+    role = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Роль",
+        renderer = DemoHtmlForm.selectRenderable[Role](_.toString),
+        placeholderAttr = "",
+        typeAttr = "select",
+        options = Role.values.map(_.toString).toSeq
+      )
     ),
-    agree = DemoHtmlForm.FieldSchema(
-      label = "Я согласен с условиями",
-      renderer = DemoHtmlForm.boolRenderable,
-      placeholderAttr = "",
-      typeAttr = "checkbox",
-      validator = Validator.requiredTrue.toZIO
+    bio = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "О себе",
+        renderer = DemoHtmlForm.stringRenderable.optional,
+        placeholderAttr = "Расскажите о себе",
+        typeAttr = "text"
+      )
     ),
-    address = DemoHtmlForm.FieldSchema(
+    agree = DemoHtmlForm.FormSchema.Field(
+      DemoHtmlForm.FieldSchema(
+        label = "Я согласен с условиями",
+        renderer = DemoHtmlForm.boolRenderable,
+        placeholderAttr = "",
+        typeAttr = "checkbox",
+        validator = Validator.requiredTrue.toZIO
+      )
+    ),
+    address = DemoHtmlForm.FormSchema.SubForm(
       label = "Адрес",
-      renderer = DemoHtmlForm.subformRenderable(addressSchema),
-      placeholderAttr = "",
-      typeAttr = "",
-      validator = Validator.empty.toZIO
+      form = addressSchema
+    ),
+    documents = DemoHtmlForm.FormSchema.RepeatedSubForm(
+      label = "Документы",
+      form = documentSchema
     )
   )
 
@@ -131,7 +184,7 @@ object DemoApp extends ZIOAppDefault {
         body(
           `class` := "bg-gray-100 min-h-screen flex items-center justify-center py-12",
           div(
-            `class` := "bg-white p-8 rounded-lg shadow-md w-full max-w-md",
+            `class` := "bg-white p-8 rounded-lg shadow-md w-full max-w-lg",
             h1(
               `class` := "text-2xl font-bold text-gray-900 mb-6",
               text("Регистрация")
@@ -165,7 +218,7 @@ object DemoApp extends ZIOAppDefault {
         body(
           `class` := "bg-gray-100 min-h-screen flex items-center justify-center py-12",
           div(
-            `class` := "bg-white p-8 rounded-lg shadow-md w-full max-w-md",
+            `class` := "bg-white p-8 rounded-lg shadow-md w-full max-w-lg",
             div(
               `class` := "bg-green-50 border border-green-200 rounded-lg p-6",
               h2(
@@ -188,7 +241,10 @@ object DemoApp extends ZIOAppDefault {
                   `class` := "text-sm font-medium text-gray-500",
                   text("Возраст")
                 ),
-                dd(`class` := "text-sm text-gray-900", text(data.age.toString)),
+                dd(
+                  `class` := "text-sm text-gray-900",
+                  text(data.age.toString)
+                ),
                 dt(
                   `class` := "text-sm font-medium text-gray-500",
                   text("Баллы")
@@ -223,6 +279,14 @@ object DemoApp extends ZIOAppDefault {
                 ),
                 dt(
                   `class` := "text-sm font-medium text-gray-500",
+                  text("Согласие")
+                ),
+                dd(
+                  `class` := "text-sm text-gray-900",
+                  text(if data.agree then "Да" else "Нет")
+                ),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
                   text("Город")
                 ),
                 dd(
@@ -236,7 +300,17 @@ object DemoApp extends ZIOAppDefault {
                 dd(
                   `class` := "text-sm text-gray-900",
                   text(data.address.street)
-                )
+                ),
+                dt(
+                  `class` := "text-sm font-medium text-gray-500",
+                  text("Документы")
+                ),
+                data.documents.zipWithIndex.map { (doc, i) =>
+                  dd(
+                    `class` := "text-sm text-gray-900",
+                    text(s"${i + 1}. ${doc.typ} — ${doc.number}")
+                  )
+                }
               ),
               a(
                 href := "/",
@@ -251,7 +325,11 @@ object DemoApp extends ZIOAppDefault {
 
   val routes = Routes(
     Method.GET / "" -> handler {
-      renderPage(DemoHtmlForm.draw[RegistrationForm](None, Map.empty))
+      val form = DemoHtmlForm.draw[RegistrationForm](
+        None,
+        Map.empty
+      )
+      renderPage(form)
     },
     Method.POST / "" -> handler { (req: Request) =>
       req.body.asURLEncodedForm.flatMap { fd =>
