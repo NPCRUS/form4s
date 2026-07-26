@@ -213,21 +213,36 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
               }
             case _ => None
           }).getOrElse {
-            val forms = input.formData
+            val indexedForms = input.formData
               .groupBy { field =>
                 field.name.split("\\.")(0).toIntOption.getOrElse(0)
               }
               .toSeq
               .sortBy(_._1)
-              .map { (_, fields) =>
-                Form(fields.map(f => f.name(clearPathFromName(f.name))))
+              .map { (idx, fields) =>
+                (
+                  idx,
+                  Form(fields.map(f => f.name(clearPathFromName(f.name))))
+                )
               }
 
-            val result = forms match {
-              case Seq(form) if form.formData.map(_.name).toSet.size == 1 =>
-                form.formData.map(field => decoder.decode(Form(field)))
-              case seq =>
-                seq.map(form => decoder.decode(form))
+            val result = indexedForms.flatMap { (idx, form) =>
+              (form.formData.map(_.name).toSet.size == 1) match {
+                case true =>
+                  form.formData.map(field =>
+                    decoder
+                      .decode(Form(field))
+                      .left
+                      .map(_.map(e => prependField(idx.toString, e)))
+                  )
+                case false =>
+                  Seq(
+                    decoder
+                      .decode(form)
+                      .left
+                      .map(_.map(e => prependField(idx.toString, e)))
+                  )
+              }
             }
 
             if (result.forall(_.isRight)) {
@@ -260,6 +275,14 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       key
     }
 
+  private def prependField(
+      prefix: String,
+      e: DecodingError
+  ): DecodingError =
+    e.copy(field =
+      if (e.field.isEmpty) prefix else s"$prefix.${e.field}"
+    )
+
   override def join[T](caseClass: CaseClass[FormDecoder, T]): FormDecoder[T] =
     new FormDecoder[T] {
       def decode(input: Form): Either[Seq[DecodingError], T] = {
@@ -276,13 +299,13 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
             decoder
               .decode(Form(fields))
               .left
-              .map(_.map(_.copy(field = fieldName)))
+              .map(_.map(e => prependField(fieldName, e)))
           } else {
             if (decoder.isOptional) {
               decoder
                 .decode(Form(FormField.Simple("", "")))
                 .left
-                .map(_.map(_.copy(field = fieldName)))
+                .map(_.map(e => prependField(fieldName, e)))
             } else {
               Left(Seq(DecodingError(fieldName, "Обязательное поле")))
             }
