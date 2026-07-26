@@ -1,7 +1,7 @@
 package demo
 
 import zio.http.template2.{form as formTag, *}
-import form4s.FormV2
+import form4s.Form
 import java.util.UUID
 import zio.http.template2.Dom.Element
 import zio.http.template2.Dom.Fragment
