@@ -19,19 +19,23 @@ object E2ETests extends TestSuite {
   val lastDecodeResult =
     new AtomicReference[Either[Map[String, Seq[String]], TestUserFormData]]
 
-  given TestUserForm[HtmlForm.FieldSchema] = TestUserForm(
-    username = HtmlForm.FieldSchema(
-      label = "Username",
-      renderer = HtmlForm.stringRenderable,
-      placeholderAttr = "Enter username",
-      typeAttr = "text",
-      validator = Validator.nonEmpty.toZIO
+  given TestUserForm[HtmlForm.FormSchema] = TestUserForm(
+    username = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Username",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "Enter username",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
     ),
-    age = HtmlForm.FieldSchema(
-      label = "Age",
-      renderer = HtmlForm.intRenderable,
-      placeholderAttr = "Enter age",
-      typeAttr = "number"
+    age = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Age",
+        renderer = HtmlForm.intRenderable,
+        placeholderAttr = "Enter age",
+        typeAttr = "number"
+      )
     )
   )
 

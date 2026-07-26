@@ -12,19 +12,23 @@ case class AccountForm[F[_]](
 object DecodeAndValidateTests extends TestSuite {
   type AccountFormData = AccountForm[[T] =>> T]
 
-  given AccountForm[HtmlForm.FieldSchema] = AccountForm(
-    login = HtmlForm.FieldSchema(
-      label = "Login",
-      renderer = HtmlForm.stringRenderable,
-      placeholderAttr = "Enter login",
-      typeAttr = "text",
-      validator = Validator.nonEmpty.toZIO
+  given AccountForm[HtmlForm.FormSchema] = AccountForm(
+    login = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Login",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "Enter login",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
     ),
-    age = HtmlForm.FieldSchema(
-      label = "Age",
-      renderer = HtmlForm.intRenderable,
-      placeholderAttr = "Enter age",
-      typeAttr = "number"
+    age = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Age",
+        renderer = HtmlForm.intRenderable,
+        placeholderAttr = "Enter age",
+        typeAttr = "number"
+      )
     )
   )
 
