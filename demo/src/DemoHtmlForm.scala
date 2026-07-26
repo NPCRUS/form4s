@@ -7,7 +7,7 @@ import zio.http.template2.Dom.Element
 import zio.http.template2.Dom.Fragment
 import form4s.Cursor
 
-object DemoHtmlForm extends FormV2[Element] {
+object DemoHtmlForm extends Form[Element] {
   def base: Element = div
   def amend(in: Element)(inside: Element*): Element = in(inside)
 
