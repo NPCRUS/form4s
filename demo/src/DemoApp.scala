@@ -19,6 +19,13 @@ object Role:
           .toRight(Seq(DecodingError("", "Неизвестная роль")))
       }
 
+  def label(role: Role): String = role match
+    case Role.Student   => "Студент"
+    case Role.Developer => "Разработчик"
+    case Role.Designer  => "Дизайнер"
+    case Role.Manager   => "Менеджер"
+    case Role.Other     => "Другое"
+
 case class Address[F[_]](
     city: F[String],
     street: F[String]
@@ -137,10 +144,11 @@ object DemoApp extends ZIOAppDefault {
     role = DemoHtmlForm.FormSchema.Field(
       DemoHtmlForm.FieldSchema(
         label = "Роль",
-        renderer = DemoHtmlForm.selectRenderable[Role](_.toString),
+        renderer = DemoHtmlForm.selectRenderable[Role],
         placeholderAttr = "",
         typeAttr = "select",
-        options = Role.values.map(_.toString).toSeq
+        options = Role.values.toSeq,
+        showOption = Role.label
       )
     ),
     bio = DemoHtmlForm.FormSchema.Field(
@@ -268,7 +276,7 @@ object DemoApp extends ZIOAppDefault {
                 ),
                 dd(
                   `class` := "text-sm text-gray-900",
-                  text(data.role.toString)
+                  text(Role.label(data.role))
                 ),
                 dt(
                   `class` := "text-sm font-medium text-gray-500",

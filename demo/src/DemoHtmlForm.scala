@@ -195,15 +195,14 @@ object DemoHtmlForm extends Form[Element] {
       )
   }
 
-  def selectRenderable[T](show: T => String): Renderable[T] =
+  def selectRenderable[T]: Renderable[T] =
     new Renderable[T] {
       def draw(
           schema: FieldSchema[T],
           fieldName: Cursor,
           oldValue: Option[T],
           errors: Seq[String]
-      ): Element = {
-        val oldStr = oldValue.map(show)
+      ): Element =
         div(
           `class` := "mb-4",
           label(
@@ -215,16 +214,15 @@ object DemoHtmlForm extends Form[Element] {
             name := fieldName.build,
             `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
             option(value := "", text("-- Выберите --")),
-            schema.options.map { opt =>
+            schema.options.map { v =>
               option(
-                value := opt,
-                oldStr.filter(_ == opt).map(_ => selected),
-                text(opt)
+                value := v.toString,
+                oldValue.filter(_ == v).map(_ => selected),
+                text(schema.showOption(v))
               )
             }
           ),
           errors.map(e => p(`class` := errorCls, text(e)))
         )
-      }
     }
 }

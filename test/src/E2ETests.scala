@@ -119,7 +119,9 @@ object E2ETests extends TestSuite {
                   body(
                     div(
                       id := "result",
-                      text(s"Success: ${user.username}, ${user.age}, ${user.address.city}, ${user.address.street}")
+                      text(
+                        s"Success: ${user.username}, ${user.age}, ${user.address.city}, ${user.address.street}"
+                      )
                     )
                   )
                 )

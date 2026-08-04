@@ -63,7 +63,8 @@ trait Form[Elem] {
       placeholderAttr: String,
       typeAttr: String,
       validator: ValidatorZIO[T] = Validator.empty[T].toZIO,
-      options: Seq[String] = Seq.empty
+      options: Seq[T] = Seq.empty,
+      showOption: T => String = (t: T) => t.toString
   )
 
   def draw[T[F[_]] <: Product](
@@ -110,7 +111,12 @@ trait Form[Elem] {
               errors.get(subCursor.build).getOrElse(Seq.empty)
             )
           case FormSchema.SubForm(label, form, _) =>
-            amend(subFormContainer(label, errors.get(subCursor.build).getOrElse(Seq.empty)))(
+            amend(
+              subFormContainer(
+                label,
+                errors.get(subCursor.build).getOrElse(Seq.empty)
+              )
+            )(
               drawUnsafe(
                 oldValues.map(v => v(idx)),
                 errors,
