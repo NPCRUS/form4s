@@ -35,7 +35,12 @@ trait Form[Elem] {
           errors: Seq[String]
       ): Elem =
         that.draw(
-          schema.asInstanceOf[FieldSchema[T]],
+          FieldSchema[T](
+            label = schema.label,
+            renderer = that,
+            placeholderAttr = schema.placeholderAttr,
+            typeAttr = schema.typeAttr
+          ),
           fieldName,
           oldValue.flatten,
           errors
@@ -62,9 +67,7 @@ trait Form[Elem] {
       renderer: Renderable[T],
       placeholderAttr: String,
       typeAttr: String,
-      validator: ValidatorZIO[T] = Validator.empty[T].toZIO,
-      options: Seq[T] = Seq.empty,
-      showOption: T => String = (t: T) => t.toString
+      validator: ValidatorZIO[T] = Validator.empty[T].toZIO
   )
 
   def draw[T[F[_]] <: Product](

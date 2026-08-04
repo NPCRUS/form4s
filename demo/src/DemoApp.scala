@@ -144,11 +144,10 @@ object DemoApp extends ZIOAppDefault {
     role = DemoHtmlForm.FormSchema.Field(
       DemoHtmlForm.FieldSchema(
         label = "Роль",
-        renderer = DemoHtmlForm.selectRenderable[Role],
+        renderer = DemoHtmlForm
+          .selectRenderable(Role.values.toSeq)(labelOf = Role.label),
         placeholderAttr = "",
-        typeAttr = "select",
-        options = Role.values.toSeq,
-        showOption = Role.label
+        typeAttr = "select"
       )
     ),
     bio = DemoHtmlForm.FormSchema.Field(

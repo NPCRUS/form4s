@@ -83,4 +83,34 @@ object HtmlForm extends Form[Dom] {
         errors.map(e => span(`class` := "error", text(e)))
       )
   }
+
+  def selectRenderable[T <: scala.reflect.Enum](
+      values: Seq[T]
+  )(
+      valueOf: T => String = (v: T) => v.toString,
+      labelOf: T => String = (v: T) => v.toString
+  ): Renderable[T] =
+    new Renderable[T] {
+      def draw(
+          schema: FieldSchema[T],
+          fieldName: Cursor,
+          oldValue: Option[T],
+          errors: Seq[String]
+      ): Dom =
+        div(
+          label(`for` := fieldName.build, text(schema.label)),
+          select(
+            name := fieldName.build,
+            option(value := "", text("--")),
+            values.map { v =>
+              option(
+                value := valueOf(v),
+                oldValue.filter(_ == v).map(_ => selected),
+                text(labelOf(v))
+              )
+            }
+          ),
+          errors.map(e => span(`class` := "error", text(e)))
+        )
+    }
 }

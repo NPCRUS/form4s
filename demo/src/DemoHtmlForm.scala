@@ -195,7 +195,12 @@ object DemoHtmlForm extends Form[Element] {
       )
   }
 
-  def selectRenderable[T]: Renderable[T] =
+  def selectRenderable[T <: scala.reflect.Enum](
+      values: Seq[T]
+  )(
+      valueOf: T => String = (v: T) => v.toString,
+      labelOf: T => String = (v: T) => v.toString
+  ): Renderable[T] =
     new Renderable[T] {
       def draw(
           schema: FieldSchema[T],
@@ -214,11 +219,11 @@ object DemoHtmlForm extends Form[Element] {
             name := fieldName.build,
             `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
             option(value := "", text("-- Выберите --")),
-            schema.options.map { v =>
+            values.map { v =>
               option(
-                value := v.toString,
+                value := valueOf(v),
                 oldValue.filter(_ == v).map(_ => selected),
-                text(schema.showOption(v))
+                text(labelOf(v))
               )
             }
           ),
