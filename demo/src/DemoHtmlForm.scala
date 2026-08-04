@@ -13,13 +13,14 @@ object DemoHtmlForm extends Form[Element] {
 
   def render(in: Element): String = in.render(true)
 
-  def subFormContainer(schemaLabel: String): Element =
+  def subFormContainer(schemaLabel: String, errors: Seq[String]): Element =
     div(
       `class` := "mb-4 border p-4 rounded-lg bg-gray-50",
       label(
         `class` := "block text-md font-semibold text-gray-700 mb-2",
         schemaLabel
-      )
+      ),
+      errors.map(e => p(`class` := "mt-1 text-sm text-red-600", text(e)))
     )
 
   def addBtn: Element =
@@ -42,7 +43,8 @@ object DemoHtmlForm extends Form[Element] {
       fieldLabel: String,
       fieldName: Cursor,
       items: Seq[Element],
-      templateItem: Element
+      templateItem: Element,
+      errors: Seq[String]
   ): Element =
     div(
       data("repeated") := fieldName.build,
@@ -52,6 +54,7 @@ object DemoHtmlForm extends Form[Element] {
         `class` := "block text-md font-semibold text-gray-700 mb-2",
         fieldLabel
       ),
+      errors.map(e => p(`class` := "mt-1 text-sm text-red-600", text(e))),
       items.map(i => div(data("repeated-item") := "", i)),
       template(div(data("repeated-item") := "", templateItem)),
       addBtn,

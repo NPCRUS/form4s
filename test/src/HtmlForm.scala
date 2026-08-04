@@ -7,16 +7,17 @@ object HtmlForm extends Form[Dom] {
   def base: Dom = div
   def amend(p: Dom)(inside: Dom*): Dom = Dom.fragment((p +: inside)*)
   def render(in: Dom): String = in.render(true)
-  def subFormContainer(label: String): Dom =
-    div(`class` := "subform", text(label))
+  def subFormContainer(label: String, errors: Seq[String]): Dom =
+    div(`class` := "subform", text(label), errors.map(e => span(`class` := "error", text(e))))
   def addBtn: Dom = button(`type` := "button", text("Add"))
   def deleteBtn: Dom = button(`type` := "button", text("Delete"))
   def listOfSubformsContainer(
       label: String,
       fieldName: Cursor,
       items: Seq[Dom],
-      templateItem: Dom
-  ): Dom = div(items, templateItem, addBtn)
+      templateItem: Dom,
+      errors: Seq[String]
+  ): Dom = div(errors.map(e => span(`class` := "error", text(e))), items, templateItem, addBtn)
 
   val stringRenderable: Renderable[String] = new Renderable[String] {
     def draw(

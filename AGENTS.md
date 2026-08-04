@@ -56,3 +56,11 @@ form4s/src/
 
 - **Metals** (Scala LSP) — remote at `http://127.0.0.1:33215/mcp`
 - **BrowserMCP** — local via `npx @browsermcp/mcp@latest`
+
+<!-- keep-the-why:config -->
+- context: `context/`
+- init: complete
+- context-schema: 0.6.4
+- capture-confirmation: confirm-always
+- source-reference: never
+<!-- /keep-the-why:config -->

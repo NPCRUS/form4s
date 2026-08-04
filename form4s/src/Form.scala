@@ -8,14 +8,15 @@ trait Form[Elem] {
   def base: Elem
   def amend(p: Elem)(inside: Elem*): Elem
   def render(in: Elem): String
-  def subFormContainer(label: String): Elem
+  def subFormContainer(label: String, errors: Seq[String]): Elem
   def addBtn: Elem
   def deleteBtn: Elem
   def listOfSubformsContainer(
       label: String,
       fieldName: Cursor,
       items: Seq[Elem],
-      templateItem: Elem
+      templateItem: Elem,
+      errors: Seq[String]
   ): Elem
 
   trait Renderable[T] { that =>
@@ -46,11 +47,13 @@ trait Form[Elem] {
     case Field[T](schema: FieldSchema[T]) extends FormSchema[T]
     case SubForm[F[B[_]] <: Product](
         label: String,
-        form: F[FormSchema]
+        form: F[FormSchema],
+        validator: ValidatorZIO[Any] = ValidatorZIO.empty
     ) extends FormSchema[F[FormSchema]]
     case RepeatedSubForm[F[B[_]] <: Product](
         label: String,
-        form: F[FormSchema]
+        form: F[FormSchema],
+        validator: ValidatorZIO[Any] = ValidatorZIO.empty
     ) extends FormSchema[Seq[F[FormSchema]]]
   }
 
@@ -106,15 +109,15 @@ trait Form[Elem] {
               oldValues.map(v => v(idx).asInstanceOf[Gen]),
               errors.get(subCursor.build).getOrElse(Seq.empty)
             )
-          case FormSchema.SubForm(label, form) =>
-            amend(subFormContainer(label))(
+          case FormSchema.SubForm(label, form, _) =>
+            amend(subFormContainer(label, errors.get(subCursor.build).getOrElse(Seq.empty)))(
               drawUnsafe(
                 oldValues.map(v => v(idx)),
                 errors,
                 subCursor
               )(using form)
             )
-          case FormSchema.RepeatedSubForm(label, form) =>
+          case FormSchema.RepeatedSubForm(label, form, _) =>
             val oldValuesForSeq =
               oldValues.map(v => v(idx).asInstanceOf[Seq[Any]])
             val count =
@@ -138,7 +141,8 @@ trait Form[Elem] {
               label,
               subCursor,
               existing,
-              tpl
+              tpl,
+              errors.get(subCursor.build).getOrElse(Seq.empty)
             )
       }.toSeq*
     )
@@ -169,16 +173,32 @@ trait Form[Elem] {
             schema.validator.validate(value.asInstanceOf[Gen]).map { errors =>
               Seq((cursor.down(name), errors)).toMap
             }
-          case FormSchema.SubForm(label, schema) =>
-            validateUnsafe(value, schema, cursor.down(name))
-          case FormSchema.RepeatedSubForm(label, schema) =>
+          case FormSchema.SubForm(label, schema, validator) =>
+            for {
+              subErrors <- validateUnsafe(value, schema, cursor.down(name))
+              wholeErrors <- validator
+                .validate(value)
+                .map { errs =>
+                  if (errs.nonEmpty) Map(cursor.down(name) -> errs)
+                  else Map.empty[Cursor, Seq[String]]
+                }
+            } yield subErrors ++ wholeErrors
+          case FormSchema.RepeatedSubForm(label, schema, validator) =>
             val subCursor = cursor.down(name)
-            ZIO
-              .collectAllPar(value.asInstanceOf[Seq[Any]].zipWithIndex.map {
-                (v, i) =>
-                  validateUnsafe(v, schema, subCursor.at(i))
-              })
-              .map(_.foldLeft(Map.empty[Cursor, Seq[String]])(_ ++ _))
+            for {
+              subErrors <- ZIO
+                .collectAllPar(value.asInstanceOf[Seq[Any]].zipWithIndex.map {
+                  (v, i) =>
+                    validateUnsafe(v, schema, subCursor.at(i))
+                })
+                .map(_.foldLeft(Map.empty[Cursor, Seq[String]])(_ ++ _))
+              wholeErrors <- validator
+                .validate(value)
+                .map { errs =>
+                  if (errs.nonEmpty) Map(subCursor -> errs)
+                  else Map.empty[Cursor, Seq[String]]
+                }
+            } yield subErrors ++ wholeErrors
       }.toSeq)
       .map(
         _.foldLeft(Map.empty[Cursor, Seq[String]])(_ ++ _)

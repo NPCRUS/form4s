@@ -162,7 +162,8 @@ object DemoApp extends ZIOAppDefault {
     ),
     address = DemoHtmlForm.FormSchema.SubForm(
       label = "Адрес",
-      form = addressSchema
+      form = addressSchema,
+      validator = Validator.custom("dolboeb")(_ => false).toZIO
     ),
     documents = DemoHtmlForm.FormSchema.RepeatedSubForm(
       label = "Документы",
