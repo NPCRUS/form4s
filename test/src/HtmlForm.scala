@@ -37,7 +37,10 @@ object HtmlForm extends Form[Dom] {
         errors: Seq[String]
     ): Dom =
       div(
-        label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
+        label(
+          `for` := fieldName.build,
+          text(schema.label + (if schema.required then " *" else ""))
+        ),
         input(
           name := fieldName.build,
           `type` := schema.typeAttr,
@@ -57,7 +60,10 @@ object HtmlForm extends Form[Dom] {
         errors: Seq[String]
     ): Dom =
       div(
-        label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
+        label(
+          `for` := fieldName.build,
+          text(schema.label + (if schema.required then " *" else ""))
+        ),
         input(
           name := fieldName.build,
           `type` := schema.typeAttr,
@@ -77,7 +83,10 @@ object HtmlForm extends Form[Dom] {
         errors: Seq[String]
     ): Dom =
       div(
-        label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
+        label(
+          `for` := fieldName.build,
+          text(schema.label + (if schema.required then " *" else ""))
+        ),
         input(
           name := fieldName.build,
           `type` := "checkbox",
@@ -101,7 +110,10 @@ object HtmlForm extends Form[Dom] {
           errors: Seq[String]
       ): Dom =
         div(
-          label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
+          label(
+            `for` := fieldName.build,
+            text(schema.label + (if schema.required then " *" else ""))
+          ),
           select(
             name := fieldName.build,
             option(value := "", text("--")),

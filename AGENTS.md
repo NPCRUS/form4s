@@ -54,7 +54,7 @@ test/src/            # package form4s — utest suites; HtmlForm implements Form
 
 - Scala 3 features: given instances, type lambdas, higher-kinded types, match expressions
 - scalafmt 3.10.7 with `runner.dialect = scala3`
-- No comments in code — keep it minimal
+- ScalaDoc comments on all public API entities (types, methods, given instances)
 - Validator error messages are in Russian; FormDecoder messages are too ("Обязательное поле", "Невозможно преобразовать в число", etc.)
 - Test framework: utest 0.8.9 (`test` module, sources in `test/src/`)
 - E2E tests use Playwright 1.60.0 (headless Chromium) + zio-http server

@@ -85,7 +85,9 @@ object DemoHtmlForm extends Form[Element] {
           `for` := fieldName.build,
           `class` := labelCls,
           text(schema.label),
-          Option.when(schema.required)(span(`class` := "text-red-500", text(" *")))
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
         ),
         input(
           name := fieldName.build,
@@ -113,7 +115,9 @@ object DemoHtmlForm extends Form[Element] {
           `for` := fieldName.build,
           `class` := labelCls,
           text(schema.label),
-          Option.when(schema.required)(span(`class` := "text-red-500", text(" *")))
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
         ),
         input(
           name := fieldName.build,
@@ -140,7 +144,9 @@ object DemoHtmlForm extends Form[Element] {
           `for` := fieldName.build,
           `class` := labelCls,
           text(schema.label),
-          Option.when(schema.required)(span(`class` := "text-red-500", text(" *")))
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
         ),
         input(
           name := fieldName.build,
@@ -167,7 +173,9 @@ object DemoHtmlForm extends Form[Element] {
           `for` := fieldName.build,
           `class` := labelCls,
           text(schema.label),
-          Option.when(schema.required)(span(`class` := "text-red-500", text(" *")))
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
         ),
         input(
           name := fieldName.build,
@@ -200,7 +208,9 @@ object DemoHtmlForm extends Form[Element] {
           `for` := fieldName.build,
           `class` := "text-sm text-gray-700",
           text(schema.label),
-          Option.when(schema.required)(span(`class` := "text-red-500", text(" *")))
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
@@ -225,7 +235,9 @@ object DemoHtmlForm extends Form[Element] {
             `for` := fieldName.build,
             `class` := labelCls,
             text(schema.label),
-            Option.when(schema.required)(span(`class` := "text-red-500", text(" *")))
+            Option.when(schema.required)(
+              span(`class` := "text-red-500", text(" *"))
+            )
           ),
           select(
             name := fieldName.build,

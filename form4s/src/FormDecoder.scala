@@ -12,13 +12,45 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import scala.math.BigDecimal
 
+/** Structured decode error for a single field.
+  *
+  * @param field
+  *   dot-notation path to the field, e.g. `"address.city"` or `"docs.0.typ"`
+  * @param message
+  *   human-readable error message (Russian for built-in errors)
+  */
 case class DecodingError(field: String, message: String)
 
+/** Typeclass for decoding `zio.http.Form` into a typed value `T`.
+  *
+  * Provides [[Magnolia]] auto-derivation for case classes via
+  * [[AutoDerivation]]. Sealed traits are decoded by variant name when the trait
+  * is a parameterless enum; other sealed traits produce an error.
+  *
+  * Built-in primitive decoders: `String`, `Int`, `Long`, `Double`, `Float`,
+  * `BigDecimal`, `UUID`, `Boolean`, `LocalDateTime`. Container decoders:
+  * `Option[T]`, `Seq[T]` (comma-separated or indexed dot-notation),
+  * `Either[A, B]`.
+  *
+  * @note
+  *   Built-in error messages are in Russian.
+  * @tparam T
+  *   the decoded type
+  */
 trait FormDecoder[T] { that =>
+
+  /** Decode the form input, returning either a list of field errors or the
+    * decoded value.
+    */
   def decode(input: Form): Either[Seq[DecodingError], T]
 
+  /** Whether this decoder treats missing input as a valid empty value. When
+    * `true`, a missing field is decoded as the default empty value instead of
+    * producing a "required field" error. Defaults to `false`.
+    */
   def isOptional: Boolean = false
 
+  /** Functor map: transform the decoded value. */
   def map[U](f: T => U): FormDecoder[U] = new FormDecoder[U] {
     def decode(input: Form): Either[Seq[DecodingError], U] =
       that.decode(input).map(f)
@@ -27,9 +59,18 @@ trait FormDecoder[T] { that =>
 }
 object FormDecoder extends AutoDerivation[FormDecoder] {
 
+  /** Summon a [[FormDecoder]] instance and run it. */
   def decode[T: FormDecoder](input: Form): Either[Seq[DecodingError], T] =
     summon[FormDecoder[T]].decode(input)
 
+  /** Decode a `zio.http.Body` into a typed value. Handles multipart/form-data
+    * bodies, treating `octet-stream` parts as UTF-8 text (common for
+    * form-uploaded data without explicit charset).
+    *
+    * @return
+    *   `IO[Throwable, T]` — decode errors are raised as an `Exception` (not as
+    *   [[DecodingError]]).
+    */
   def decodeFormData[T: FormDecoder](input: Body): IO[Throwable, T] = {
     input.asMultipartForm
       .map { form =>
@@ -53,6 +94,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       }
   }
 
+  /** Decodes the raw form value as a string. */
   given stringDecoder: FormDecoder[String] = new FormDecoder[String] {
     def decode(input: Form): Either[Seq[DecodingError], String] =
       input.formData.head.stringValue.toRight(
@@ -60,6 +102,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       )
   }
 
+  /** Decodes a string into `Int`. */
   given FormDecoder[Int] = new FormDecoder[Int] {
     def decode(input: Form): Either[Seq[DecodingError], Int] =
       stringDecoder
@@ -71,6 +114,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes a string into `Long`. */
   given FormDecoder[Long] = new FormDecoder[Long] {
     def decode(input: Form): Either[Seq[DecodingError], Long] =
       stringDecoder
@@ -82,6 +126,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes a string into `Double`. */
   given FormDecoder[Double] = new FormDecoder[Double] {
     def decode(input: Form): Either[Seq[DecodingError], Double] =
       stringDecoder
@@ -93,6 +138,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes a string into `Float`. */
   given FormDecoder[Float] = new FormDecoder[Float] {
     def decode(input: Form): Either[Seq[DecodingError], Float] =
       stringDecoder
@@ -104,6 +150,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes a string into `scala.math.BigDecimal`. */
   given FormDecoder[BigDecimal] = new FormDecoder[BigDecimal] {
     def decode(input: Form): Either[Seq[DecodingError], BigDecimal] =
       stringDecoder
@@ -116,6 +163,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes a string into `java.util.UUID`. */
   given FormDecoder[UUID] = new FormDecoder[UUID] {
     def decode(input: Form): Either[Seq[DecodingError], UUID] =
       stringDecoder
@@ -128,6 +176,9 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes a checkbox value: `"on"`, `"true"`, `"1"` → `true`; `"off"`,
+    * `"false"`, `"0"`, missing → `false`. Always optional.
+    */
   given FormDecoder[Boolean] = new FormDecoder[Boolean] {
     def decode(input: Form): Either[Seq[DecodingError], Boolean] =
       stringDecoder
@@ -146,6 +197,9 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
   private val dateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
 
+  /** Decodes a `LocalDateTime` from `yyyy-MM-dd'T'HH:mm` format; falls back to
+    * appending `:00` seconds.
+    */
   given FormDecoder[LocalDateTime] = new FormDecoder[LocalDateTime] {
     def decode(input: Form): Either[Seq[DecodingError], LocalDateTime] =
       stringDecoder
@@ -165,6 +219,9 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
         )
   }
 
+  /** Decodes an optional field: empty string or missing → `None`. Always
+    * optional.
+    */
   given [T](using decoder: FormDecoder[T]): FormDecoder[Option[T]] =
     new FormDecoder[Option[T]] {
       def decode(input: Form): Either[Seq[DecodingError], Option[T]] =
@@ -182,6 +239,10 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       override def isOptional: Boolean = true
     }
 
+  /** Decodes a sequence of values. Supports comma-separated values in a single
+    * field and indexed dot-notation (`docs.0.typ`, `docs.1.typ`). Always
+    * optional (missing → empty seq).
+    */
   given [T](using decoder: FormDecoder[T]): FormDecoder[Seq[T]] =
     new FormDecoder[Seq[T]] {
       def decode(input: Form): Either[Seq[DecodingError], Seq[T]] =
@@ -256,6 +317,7 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       override def isOptional: Boolean = true
     }
 
+  /** Tries decoding as `A` first, falling back to `B`. */
   given either[A, B](using
       decoderA: FormDecoder[A],
       decoderB: FormDecoder[B]
@@ -283,6 +345,12 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       if (e.field.isEmpty) prefix else s"$prefix.${e.field}"
     )
 
+  /** Magnolia auto-derivation for case classes. Decodes each parameter by
+    * filtering form fields by the parameter name (supporting dot-notation
+    * nesting), then constructs the case class.
+    *
+    * Missing non-optional fields produce a "required field" error.
+    */
   override def join[T](caseClass: CaseClass[FormDecoder, T]): FormDecoder[T] =
     new FormDecoder[T] {
       def decode(input: Form): Either[Seq[DecodingError], T] = {
@@ -325,6 +393,10 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
       }
     }
 
+  /** Magnolia auto-derivation for sealed traits. Supports parameterless enums
+    * by matching the form value against variant names. Non-enum sealed traits
+    * produce a decode error.
+    */
   override def split[T](
       sealedTrait: SealedTrait[FormDecoder, T]
   ): FormDecoder[T] =
