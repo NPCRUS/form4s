@@ -6,7 +6,7 @@ import mill.*, scalalib.*, publish.*
 
 object form4s extends ScalaModule with PublishModule {
   def scalaVersion = "3.8.4"
-  def publishVersion = "0.0.2"
+  def publishVersion = "0.0.3"
 
   def pomSettings = PomSettings(
     description =
