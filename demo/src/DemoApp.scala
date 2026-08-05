@@ -39,7 +39,7 @@ case class Document[F[_]](
 case class RegistrationForm[F[_]](
     username: F[String],
     email: F[String],
-    age: F[Int],
+    age: F[Option[Int]],
     score: F[Long],
     referralId: F[UUID],
     role: F[Role],
@@ -50,6 +50,16 @@ case class RegistrationForm[F[_]](
 )
 
 object DemoApp extends ZIOAppDefault {
+  val t = DemoHtmlForm
+    .FieldSchema[Option[Int]](
+      label = "Возраст",
+      renderer = DemoHtmlForm.intRenderable.optional,
+      placeholderAttr = "Введите возраст",
+      typeAttr = "number",
+      validator = Validator.empty.toZIO
+      // Validator.compose(Validator.min(1), Validator.max(150)).toZIO
+    )
+  println(t.required)
   type RegistrationFormData = RegistrationForm[[T] =>> T]
 
   private val addressSchema = Address(
@@ -120,11 +130,11 @@ object DemoApp extends ZIOAppDefault {
       DemoHtmlForm
         .FieldSchema(
           label = "Возраст",
-          renderer = DemoHtmlForm.intRenderable,
+          renderer = DemoHtmlForm.intRenderable.optional,
           placeholderAttr = "Введите возраст",
           typeAttr = "number",
-          validator =
-            Validator.compose(Validator.min(1), Validator.max(150)).toZIO
+          validator = Validator.empty.toZIO
+          // Validator.compose(Validator.min(1), Validator.max(150)).toZIO
         )
     ),
     score = DemoHtmlForm.FormSchema.Field(
@@ -202,6 +212,7 @@ object DemoApp extends ZIOAppDefault {
             formTag(
               method := "post",
               action := "/",
+              noValidate,
               formContent,
               button(
                 `type` := "submit",

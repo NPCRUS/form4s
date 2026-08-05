@@ -3,7 +3,12 @@ package form4s
 import zio.ZIO
 import scala.deriving.Mirror
 import scala.compiletime.summonInline
-import scala.compiletime.constValue
+import scala.compiletime.erasedValue
+
+inline def defaultRequired[T]: Boolean = inline erasedValue[T] match {
+  case _: Option[?] => false
+  case _            => true
+}
 
 trait Form[Elem] {
   def base: Elem
@@ -41,7 +46,8 @@ trait Form[Elem] {
             label = schema.label,
             renderer = that,
             placeholderAttr = schema.placeholderAttr,
-            typeAttr = schema.typeAttr
+            typeAttr = schema.typeAttr,
+            required = false
           ),
           fieldName,
           oldValue.flatten,
@@ -65,19 +71,14 @@ trait Form[Elem] {
     ) extends FormSchema[Seq[F[FormSchema]]]
   }
 
-  private type IsOption[T] <: Boolean = T match
-    case Option[?] => true
-    case _         => false
-
   case class FieldSchema[T](
       label: String,
       renderer: Renderable[T],
       placeholderAttr: String,
       typeAttr: String,
-      validator: ValidatorZIO[T] = Validator.empty[T].toZIO
-  ) {
-    inline def required: Boolean = !constValue[IsOption[T]]
-  }
+      validator: ValidatorZIO[T] = Validator.empty[T].toZIO,
+      required: Boolean = defaultRequired[T]
+  )
 
   def draw[T[F[_]] <: Product](
       oldValue: Option[T[[T] =>> T]],

@@ -74,6 +74,7 @@ object E2ETests extends TestSuite {
             formTag(
               method := "post",
               action := "/",
+              noValidate,
               HtmlForm.draw[TestUserForm](None, Map.empty),
               button(`type` := "submit", text("Submit"))
             )
@@ -100,6 +101,7 @@ object E2ETests extends TestSuite {
                     formTag(
                       method := "post",
                       action := "/",
+                      noValidate,
                       HtmlForm
                         .draw[TestUserForm](
                           incomplete.oldForm,

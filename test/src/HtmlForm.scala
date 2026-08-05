@@ -20,7 +20,8 @@ object HtmlForm extends Form[Dom] {
       fieldName: Cursor,
       items: Seq[Dom],
       templateItem: Dom,
-      errors: Seq[String]
+      errors: Seq[String],
+      required: Boolean
   ): Dom = div(
     errors.map(e => span(`class` := "error", text(e))),
     items,
@@ -36,12 +37,13 @@ object HtmlForm extends Form[Dom] {
         errors: Seq[String]
     ): Dom =
       div(
-        label(`for` := fieldName.build, text(schema.label)),
+        label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
         input(
           name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
-          oldValue.map(v => value := v)
+          oldValue.map(v => value := v),
+          Option.when(schema.required)(required)
         ),
         errors.map(e => span(`class` := "error", text(e)))
       )
@@ -55,12 +57,13 @@ object HtmlForm extends Form[Dom] {
         errors: Seq[String]
     ): Dom =
       div(
-        label(`for` := fieldName.build, text(schema.label)),
+        label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
         input(
           name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
-          oldValue.map(v => value := v.toString)
+          oldValue.map(v => value := v.toString),
+          Option.when(schema.required)(required)
         ),
         errors.map(e => span(`class` := "error", text(e)))
       )
@@ -74,7 +77,7 @@ object HtmlForm extends Form[Dom] {
         errors: Seq[String]
     ): Dom =
       div(
-        label(`for` := fieldName.build, text(schema.label)),
+        label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
         input(
           name := fieldName.build,
           `type` := "checkbox",
@@ -98,7 +101,7 @@ object HtmlForm extends Form[Dom] {
           errors: Seq[String]
       ): Dom =
         div(
-          label(`for` := fieldName.build, text(schema.label)),
+          label(`for` := fieldName.build, text(schema.label + (if schema.required then " *" else ""))),
           select(
             name := fieldName.build,
             option(value := "", text("--")),
@@ -108,7 +111,8 @@ object HtmlForm extends Form[Dom] {
                 oldValue.filter(_ == v).map(_ => selected),
                 text(labelOf(v))
               )
-            }
+            },
+            Option.when(schema.required)(required)
           ),
           errors.map(e => span(`class` := "error", text(e)))
         )
