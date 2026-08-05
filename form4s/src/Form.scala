@@ -3,6 +3,7 @@ package form4s
 import zio.ZIO
 import scala.deriving.Mirror
 import scala.compiletime.summonInline
+import scala.compiletime.constValue
 
 trait Form[Elem] {
   def base: Elem
@@ -16,7 +17,8 @@ trait Form[Elem] {
       fieldName: Cursor,
       items: Seq[Elem],
       templateItem: Elem,
-      errors: Seq[String]
+      errors: Seq[String],
+      required: Boolean
   ): Elem
 
   trait Renderable[T] { that =>
@@ -58,9 +60,14 @@ trait Form[Elem] {
     case RepeatedSubForm[F[B[_]] <: Product](
         label: String,
         form: F[FormSchema],
+        required: Boolean = false,
         validator: ValidatorZIO[Any] = ValidatorZIO.empty
     ) extends FormSchema[Seq[F[FormSchema]]]
   }
+
+  private type IsOption[T] <: Boolean = T match
+    case Option[?] => true
+    case _         => false
 
   case class FieldSchema[T](
       label: String,
@@ -68,7 +75,9 @@ trait Form[Elem] {
       placeholderAttr: String,
       typeAttr: String,
       validator: ValidatorZIO[T] = Validator.empty[T].toZIO
-  )
+  ) {
+    inline def required: Boolean = !constValue[IsOption[T]]
+  }
 
   def draw[T[F[_]] <: Product](
       oldValue: Option[T[[T] =>> T]],
@@ -126,7 +135,7 @@ trait Form[Elem] {
                 subCursor
               )(using form)
             )
-          case FormSchema.RepeatedSubForm(label, form, _) =>
+          case FormSchema.RepeatedSubForm(label, form, required, _) =>
             val oldValuesForSeq =
               oldValues.map(v => v(idx).asInstanceOf[Seq[Any]])
             val count =
@@ -151,7 +160,8 @@ trait Form[Elem] {
               subCursor,
               existing,
               tpl,
-              errors.get(subCursor.build).getOrElse(Seq.empty)
+              errors.get(subCursor.build).getOrElse(Seq.empty),
+              required
             )
       }.toSeq*
     )
@@ -192,7 +202,7 @@ trait Form[Elem] {
                   else Map.empty[Cursor, Seq[String]]
                 }
             } yield subErrors ++ wholeErrors
-          case FormSchema.RepeatedSubForm(label, schema, validator) =>
+          case FormSchema.RepeatedSubForm(label, schema, required, validator) =>
             val subCursor = cursor.down(name)
             for {
               subErrors <- ZIO

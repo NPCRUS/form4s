@@ -44,7 +44,8 @@ object DemoHtmlForm extends Form[Element] {
       fieldName: Cursor,
       items: Seq[Element],
       templateItem: Element,
-      errors: Seq[String]
+      errors: Seq[String],
+      required: Boolean
   ): Element =
     div(
       data("repeated") := fieldName.build,

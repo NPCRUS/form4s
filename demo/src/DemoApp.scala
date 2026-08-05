@@ -106,24 +106,26 @@ object DemoApp extends ZIOAppDefault {
       )
     ),
     email = DemoHtmlForm.FormSchema.Field(
-      DemoHtmlForm.FieldSchema(
-        label = "Email",
-        renderer = DemoHtmlForm.stringRenderable,
-        placeholderAttr = "example@mail.com",
-        typeAttr = "email",
-        validator =
-          Validator.compose(Validator.nonEmpty, Validator.isEmail).toZIO
-      )
+      DemoHtmlForm
+        .FieldSchema(
+          label = "Email",
+          renderer = DemoHtmlForm.stringRenderable,
+          placeholderAttr = "example@mail.com",
+          typeAttr = "email",
+          validator =
+            Validator.compose(Validator.nonEmpty, Validator.isEmail).toZIO
+        )
     ),
     age = DemoHtmlForm.FormSchema.Field(
-      DemoHtmlForm.FieldSchema(
-        label = "Возраст",
-        renderer = DemoHtmlForm.intRenderable,
-        placeholderAttr = "Введите возраст",
-        typeAttr = "number",
-        validator =
-          Validator.compose(Validator.min(1), Validator.max(150)).toZIO
-      )
+      DemoHtmlForm
+        .FieldSchema(
+          label = "Возраст",
+          renderer = DemoHtmlForm.intRenderable,
+          placeholderAttr = "Введите возраст",
+          typeAttr = "number",
+          validator =
+            Validator.compose(Validator.min(1), Validator.max(150)).toZIO
+        )
     ),
     score = DemoHtmlForm.FormSchema.Field(
       DemoHtmlForm.FieldSchema(
