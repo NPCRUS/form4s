@@ -50,16 +50,6 @@ case class RegistrationForm[F[_]](
 )
 
 object DemoApp extends ZIOAppDefault {
-  val t = DemoHtmlForm
-    .FieldSchema[Option[Int]](
-      label = "Возраст",
-      renderer = DemoHtmlForm.intRenderable.optional,
-      placeholderAttr = "Введите возраст",
-      typeAttr = "number",
-      validator = Validator.empty.toZIO
-      // Validator.compose(Validator.min(1), Validator.max(150)).toZIO
-    )
-  println(t.required)
   type RegistrationFormData = RegistrationForm[[T] =>> T]
 
   private val addressSchema = Address(
@@ -111,8 +101,7 @@ object DemoApp extends ZIOAppDefault {
         renderer = DemoHtmlForm.stringRenderable,
         placeholderAttr = "Введите имя",
         typeAttr = "text",
-        validator =
-          Validator.compose(Validator.nonEmpty, Validator.minLength(3)).toZIO
+        validator = Validator.compose(Validator.minLength(3)).toZIO
       )
     ),
     email = DemoHtmlForm.FormSchema.Field(
@@ -122,8 +111,7 @@ object DemoApp extends ZIOAppDefault {
           renderer = DemoHtmlForm.stringRenderable,
           placeholderAttr = "example@mail.com",
           typeAttr = "email",
-          validator =
-            Validator.compose(Validator.nonEmpty, Validator.isEmail).toZIO
+          validator = Validator.compose(Validator.isEmail).toZIO
         )
     ),
     age = DemoHtmlForm.FormSchema.Field(
@@ -181,8 +169,7 @@ object DemoApp extends ZIOAppDefault {
     ),
     address = DemoHtmlForm.FormSchema.SubForm(
       label = "Адрес",
-      form = addressSchema,
-      validator = Validator.custom("dolboeb")(_ => false).toZIO
+      form = addressSchema
     ),
     documents = DemoHtmlForm.FormSchema.RepeatedSubForm(
       label = "Документы",

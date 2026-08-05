@@ -141,7 +141,7 @@ trait Form[Elem] {
     case SubForm[F[B[_]] <: Product](
         label: String,
         form: F[FormSchema],
-        validator: ValidatorZIO[Any] = ValidatorZIO.empty
+        validator: ValidatorZIO[F[[T] =>> T]] = ValidatorZIO.empty[F[[T] =>> T]]
     ) extends FormSchema[F[FormSchema]]
 
     /** A repeated sub-form, e.g. a list of document entries. Supports
@@ -156,7 +156,8 @@ trait Form[Elem] {
         label: String,
         form: F[FormSchema],
         required: Boolean = false,
-        validator: ValidatorZIO[Any] = ValidatorZIO.empty
+        validator: ValidatorZIO[Seq[F[[T] =>> T]]] =
+          ValidatorZIO.empty[Seq[F[[T] =>> T]]]
     ) extends FormSchema[Seq[F[FormSchema]]]
   }
 
@@ -294,6 +295,11 @@ trait Form[Elem] {
   ) =
     validate(data.asInstanceOf[T[[T] =>> T]], cursor)(using schema)
 
+  private def validateUnsafe[T[F[_]]](
+      validator: ValidatorZIO[T[[T] =>> T]],
+      value: Any
+  ) = validator.validate(value.asInstanceOf[T[[T] =>> T]])
+
   private def validate[T[F[_]] <: Product](
       formData: T[[T] =>> T],
       cursor: Cursor
@@ -309,14 +315,22 @@ trait Form[Elem] {
         val name = names(idx)
         schema match
           case FormSchema.Field(schema) =>
-            schema.validator.validate(value.asInstanceOf[Gen]).map { errors =>
-              Seq((cursor.down(name), errors)).toMap
-            }
+            val requiredValidator: Validator[Gen] =
+              value.asInstanceOf[Gen] match {
+                case s: String =>
+                  Validator.nonEmpty.asInstanceOf[Validator[Gen]]
+                case _ => Validator.empty
+              }
+            ValidatorZIO
+              .compose(schema.validator, requiredValidator.toZIO)
+              .validate(value.asInstanceOf[Gen])
+              .map { errors =>
+                Seq((cursor.down(name), errors)).toMap
+              }
           case FormSchema.SubForm(label, schema, validator) =>
             for {
               subErrors <- validateUnsafe(value, schema, cursor.down(name))
-              wholeErrors <- validator
-                .validate(value)
+              wholeErrors <- validateUnsafe(validator, value)
                 .map { errs =>
                   if (errs.nonEmpty) Map(cursor.down(name) -> errs)
                   else Map.empty[Cursor, Seq[String]]
@@ -324,6 +338,8 @@ trait Form[Elem] {
             } yield subErrors ++ wholeErrors
           case FormSchema.RepeatedSubForm(label, schema, required, validator) =>
             val subCursor = cursor.down(name)
+            val requiredValidator: Validator[Seq[?]] =
+              if (required) Validator.nonEmptySeq else Validator.empty
             for {
               subErrors <- ZIO
                 .collectAllPar(value.asInstanceOf[Seq[Any]].zipWithIndex.map {
@@ -331,8 +347,12 @@ trait Form[Elem] {
                     validateUnsafe(v, schema, subCursor.at(i))
                 })
                 .map(_.foldLeft(Map.empty[Cursor, Seq[String]])(_ ++ _))
-              wholeErrors <- validator
-                .validate(value)
+              wholeErrors <- ValidatorZIO
+                .compose(
+                  validator.asInstanceOf[ValidatorZIO[Seq[?]]],
+                  requiredValidator.toZIO
+                )
+                .validate(value.asInstanceOf[Seq[?]])
                 .map { errs =>
                   if (errs.nonEmpty) Map(subCursor -> errs)
                   else Map.empty[Cursor, Seq[String]]
