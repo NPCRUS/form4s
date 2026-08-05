@@ -3,9 +3,67 @@ package demo
 import zio.http.template2.{form as formTag, *}
 import form4s.Form
 import java.util.UUID
+import zio.http.template2.Dom.Element
+import zio.http.template2.Dom.Fragment
+import form4s.Cursor
 
-object DemoHtmlForm extends Form[Dom] {
-  def compose(out: Dom*): Dom = fragment(out*)
+object DemoHtmlForm extends Form[Element] {
+  def base: Element = div
+  def amend(in: Element)(inside: Element*): Element = in(inside)
+
+  def render(in: Element): String = in.render(true)
+
+  def subFormContainer(schemaLabel: String, errors: Seq[String]): Element =
+    div(
+      `class` := "mb-4 border p-4 rounded-lg bg-gray-50",
+      label(
+        `class` := "block text-md font-semibold text-gray-700 mb-2",
+        schemaLabel
+      ),
+      errors.map(e => p(`class` := "mt-1 text-sm text-red-600", text(e)))
+    )
+
+  def addBtn: Element =
+    button(
+      `type` := "button",
+      `class` := "mt-2 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200",
+      custom("onclick") := "form4s.addItem(this)",
+      text("+ Добавить")
+    )
+
+  def deleteBtn: Element =
+    button(
+      `type` := "button",
+      `class` := "text-red-600 hover:text-red-900 ml-2",
+      custom("onclick") := "form4s.deleteItem(this)",
+      text("✕")
+    )
+
+  def listOfSubformsContainer(
+      fieldLabel: String,
+      fieldName: Cursor,
+      items: Seq[Element],
+      templateItem: Element,
+      errors: Seq[String],
+      required: Boolean
+  ): Element =
+    div(
+      data("repeated") := fieldName.build,
+      data("next-index") := items.size.toString,
+      `class` := "mb-4 border p-4 rounded-lg bg-gray-50",
+      label(
+        `class` := "block text-md font-semibold text-gray-700 mb-2",
+        text(fieldLabel),
+        Option.when(required)(span(`class` := "text-red-500", text(" *")))
+      ),
+      errors.map(e => p(`class` := "mt-1 text-sm text-red-600", text(e))),
+      items.map(i => div(data("repeated-item") := "", i)),
+      template(div(data("repeated-item") := "", templateItem)),
+      addBtn,
+      script.inlineJs(
+        "(function(){if(window.form4s)return;window.form4s={addItem:function(b){var c=b.closest('[data-repeated]');var t=c.querySelector('template');var n=parseInt(c.getAttribute('data-next-index'));c.setAttribute('data-next-index',n+1);var f=t.content.cloneNode(true);var re=/\\.0\\./g;var rp='.'+n+'.';f.querySelectorAll('[name]').forEach(function(e){e.name=e.name.replace(re,rp)});f.querySelectorAll('[for]').forEach(function(e){e.setAttribute('for',e.getAttribute('for').replace(re,rp))});f.querySelectorAll('[id]').forEach(function(e){e.id=e.id.replace(re,rp)});t.before(f)},deleteItem:function(b){var i=b.closest('[data-repeated-item]');if(i)i.remove()}}})()"
+      )
+    )
 
   val inputCls: String =
     "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
@@ -17,40 +75,57 @@ object DemoHtmlForm extends Form[Dom] {
   val stringRenderable: Renderable[String] = new Renderable[String] {
     def draw(
         schema: FieldSchema[String],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[String],
         errors: Seq[String]
-    ): Dom =
+    ): Element = {
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label),
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
-          oldValue.map(v => value := v)
+          oldValue.map(v => value := v),
+          Option.when(schema.required)(required)
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
+    }
   }
 
   val intRenderable: Renderable[Int] = new Renderable[Int] {
     def draw(
         schema: FieldSchema[Int],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[Int],
         errors: Seq[String]
-    ): Dom =
+    ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label),
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
-          oldValue.map(v => value := v.toString)
+          oldValue.map(v => value := v.toString),
+          Option.when(schema.required)(required)
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
@@ -59,19 +134,27 @@ object DemoHtmlForm extends Form[Dom] {
   val longRenderable: Renderable[Long] = new Renderable[Long] {
     def draw(
         schema: FieldSchema[Long],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[Long],
         errors: Seq[String]
-    ): Dom =
+    ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label),
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
-          oldValue.map(v => value := v.toString)
+          oldValue.map(v => value := v.toString),
+          Option.when(schema.required)(required)
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
@@ -80,19 +163,27 @@ object DemoHtmlForm extends Form[Dom] {
   val uuidRenderable: Renderable[UUID] = new Renderable[UUID] {
     def draw(
         schema: FieldSchema[UUID],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[UUID],
         errors: Seq[String]
-    ): Dom =
+    ): Element =
       div(
         `class` := "mb-4",
-        label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+        label(
+          `for` := fieldName.build,
+          `class` := labelCls,
+          text(schema.label),
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
+        ),
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := schema.typeAttr,
           placeholder := schema.placeholderAttr,
           `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
-          oldValue.map(v => value := v.toString)
+          oldValue.map(v => value := v.toString),
+          Option.when(schema.required)(required)
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
@@ -101,75 +192,67 @@ object DemoHtmlForm extends Form[Dom] {
   val boolRenderable: Renderable[Boolean] = new Renderable[Boolean] {
     def draw(
         schema: FieldSchema[Boolean],
-        fieldName: String,
+        fieldName: Cursor,
         oldValue: Option[Boolean],
         errors: Seq[String]
-    ): Dom =
+    ): Element =
       div(
         `class` := "mb-4 flex items-center gap-2",
         input(
-          name := fieldName,
+          name := fieldName.build,
           `type` := "checkbox",
           `class` := "h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500",
           oldValue.filter(identity).map(_ => checked)
         ),
         label(
-          `for` := fieldName,
+          `for` := fieldName.build,
           `class` := "text-sm text-gray-700",
-          text(schema.label)
+          text(schema.label),
+          Option.when(schema.required)(
+            span(`class` := "text-red-500", text(" *"))
+          )
         ),
         errors.map(e => p(`class` := errorCls, text(e)))
       )
   }
 
-  def selectRenderable[T](show: T => String): Renderable[T] =
+  def selectRenderable[T <: scala.reflect.Enum](
+      values: Seq[T]
+  )(
+      valueOf: T => String = (v: T) => v.toString,
+      labelOf: T => String = (v: T) => v.toString
+  ): Renderable[T] =
     new Renderable[T] {
       def draw(
           schema: FieldSchema[T],
-          fieldName: String,
+          fieldName: Cursor,
           oldValue: Option[T],
           errors: Seq[String]
-      ): Dom = {
-        val oldStr = oldValue.map(show)
+      ): Element =
         div(
           `class` := "mb-4",
-          label(`for` := fieldName, `class` := labelCls, text(schema.label)),
+          label(
+            `for` := fieldName.build,
+            `class` := labelCls,
+            text(schema.label),
+            Option.when(schema.required)(
+              span(`class` := "text-red-500", text(" *"))
+            )
+          ),
           select(
-            name := fieldName,
+            name := fieldName.build,
             `class` := (if (errors.nonEmpty) inputErrCls else inputCls),
             option(value := "", text("-- Выберите --")),
-            schema.options.map { opt =>
+            values.map { v =>
               option(
-                value := opt,
-                oldStr.filter(_ == opt).map(_ => selected),
-                text(opt)
+                value := valueOf(v),
+                oldValue.filter(_ == v).map(_ => selected),
+                text(labelOf(v))
               )
-            }
+            },
+            Option.when(schema.required)(required)
           ),
           errors.map(e => p(`class` := errorCls, text(e)))
-        )
-      }
-    }
-
-  def subformRenderable[A[F[_]] <: Product](
-      subSchema: A[FieldSchema]
-  ): Renderable[A[FieldSchema]] =
-    new Renderable[A[FieldSchema]] {
-      def draw(
-          schema: FieldSchema[A[FieldSchema]],
-          fieldName: String,
-          oldValue: Option[A[FieldSchema]],
-          errors: Seq[String]
-      ): Dom =
-        val data = oldValue.asInstanceOf[Option[A[[X] =>> X]]]
-        val inner = drawSubform[A](fieldName, data, Map.empty)(using subSchema)
-        val modifiers: Seq[Modifier] =
-          label(
-            `class` := "block text-md font-semibold text-gray-700 mb-2",
-            text(schema.label)
-          ) +: (errors.map(e => p(`class` := errorCls, text(e))) :+ inner)
-        compose(
-          div(`class` := "mb-4 border p-4 rounded-lg bg-gray-50", modifiers*)
         )
     }
 }

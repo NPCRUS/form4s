@@ -447,7 +447,8 @@ object FormDecoderTests extends TestSuite {
 
     test("decode indexed Seq[Address] with two subforms") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.city", "NYC"),
@@ -468,7 +469,8 @@ object FormDecoderTests extends TestSuite {
 
     test("decode indexed Seq[Address] with single element") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.city", "NYC"),
@@ -501,21 +503,99 @@ object FormDecoderTests extends TestSuite {
 
     test("decode indexed Seq[Address] reports errors from subforms") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.city", "NYC"),
         FormField.Simple("addresses.1.street", "Beacon St")
       )
       val decoded = summon[FormDecoder[Person]].decode(form)
-      assert(decoded.isLeft)
-      val errors = decoded.left.getOrElse(Seq.empty)
-      assert(errors.exists(_.message == "Обязательное поле"))
+      assert(
+        decoded == Left(
+          Seq(
+            DecodingError("addresses.0.street", "Обязательное поле"),
+            DecodingError("addresses.1.city", "Обязательное поле")
+          )
+        )
+      )
+    }
+
+    test(
+      "decode nested case class reports error with subform field path"
+    ) {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, address: Address) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("address.city", "NYC")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(
+        decoded == Left(
+          Seq(DecodingError("address.street", "Обязательное поле"))
+        )
+      )
+    }
+
+    test(
+      "decode nested subform propagates conversion errors with field path"
+    ) {
+      case class Address(zip: Int, city: String) derives FormDecoder
+      case class Person(name: String, address: Address) derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("address.zip", "abc"),
+        FormField.Simple("address.city", "NYC")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(
+        decoded == Left(
+          Seq(DecodingError("address.zip", "Невозможно преобразовать в число"))
+        )
+      )
+    }
+
+    test(
+      "decode nested subforms propagates errors through all levels"
+    ) {
+      case class Location(city: String, zip: Int) derives FormDecoder
+      case class Address(street: String, location: Location) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
+      val form = Form(
+        FormField.Simple("name", "Alice"),
+        FormField.Simple("addresses.0.street", "Main St"),
+        FormField.Simple("addresses.0.location.city", "NYC"),
+        FormField.Simple("addresses.0.location.zip", "abc")
+      )
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(
+        decoded == Left(
+          Seq(
+            DecodingError(
+              "addresses.0.location.zip",
+              "Невозможно преобразовать в число"
+            )
+          )
+        )
+      )
+    }
+
+    test("decode missing subform reports error on subform field itself") {
+      case class Address(city: String, street: String) derives FormDecoder
+      case class Person(name: String, address: Address) derives FormDecoder
+      val form = Form(FormField.Simple("name", "Alice"))
+      val decoded = summon[FormDecoder[Person]].decode(form)
+      assert(
+        decoded == Left(Seq(DecodingError("address", "Обязательное поле")))
+      )
     }
 
     test("decode empty indexed Seq via case class") {
       case class Address(city: String, street: String) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(FormField.Simple("name", "Alice"))
       val decoded = summon[FormDecoder[Person]].decode(form)
       assert(decoded == Right(Person("Alice", Seq.empty)))
@@ -524,7 +604,8 @@ object FormDecoderTests extends TestSuite {
     test("decode nested indexed subforms (multi-level)") {
       case class Location(city: String) derives FormDecoder
       case class Address(street: String, location: Location) derives FormDecoder
-      case class Person(name: String, addresses: Seq[Address]) derives FormDecoder
+      case class Person(name: String, addresses: Seq[Address])
+          derives FormDecoder
       val form = Form(
         FormField.Simple("name", "Alice"),
         FormField.Simple("addresses.0.street", "Main St"),

@@ -14,7 +14,9 @@ object ValidatorTests extends TestSuite {
     }
 
     test("nonEmpty invalid") {
-      assert(Validator.nonEmpty.validate("") == Seq("Поле должно быть заполнено"))
+      assert(
+        Validator.nonEmpty.validate("") == Seq("Поле должно быть заполнено")
+      )
     }
 
     test("required valid") {

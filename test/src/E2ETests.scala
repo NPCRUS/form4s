@@ -9,7 +9,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 case class TestUserForm[F[_]](
     username: F[String],
-    age: F[Int]
+    age: F[Int],
+    address: F[AddressF[F]]
 )
 
 object E2ETests extends TestSuite {
@@ -19,19 +20,48 @@ object E2ETests extends TestSuite {
   val lastDecodeResult =
     new AtomicReference[Either[Map[String, Seq[String]], TestUserFormData]]
 
-  given TestUserForm[HtmlForm.FieldSchema] = TestUserForm(
-    username = HtmlForm.FieldSchema(
-      label = "Username",
-      renderer = HtmlForm.stringRenderable,
-      placeholderAttr = "Enter username",
-      typeAttr = "text",
-      validator = Validator.nonEmpty.toZIO
+  given TestUserForm[HtmlForm.FormSchema] = TestUserForm(
+    username = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Username",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "Enter username",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
     ),
-    age = HtmlForm.FieldSchema(
-      label = "Age",
-      renderer = HtmlForm.intRenderable,
-      placeholderAttr = "Enter age",
-      typeAttr = "number"
+    age = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Age",
+        renderer = HtmlForm.intRenderable,
+        placeholderAttr = "Enter age",
+        typeAttr = "number"
+      )
+    ),
+    address = HtmlForm.FormSchema.SubForm(
+      "Address",
+      addressSchema
+    )
+  )
+
+  private def addressSchema: AddressF[HtmlForm.FormSchema] = AddressF(
+    city = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "City",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "city",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
+    ),
+    street = HtmlForm.FormSchema.Field(
+      HtmlForm.FieldSchema(
+        label = "Street",
+        renderer = HtmlForm.stringRenderable,
+        placeholderAttr = "street",
+        typeAttr = "text",
+        validator = Validator.nonEmpty.toZIO
+      )
     )
   )
 
@@ -44,6 +74,7 @@ object E2ETests extends TestSuite {
             formTag(
               method := "post",
               action := "/",
+              noValidate,
               HtmlForm.draw[TestUserForm](None, Map.empty),
               button(`type` := "submit", text("Submit"))
             )
@@ -58,10 +89,10 @@ object E2ETests extends TestSuite {
           .fold(
             incomplete => {
               lastDecodeResult.set(Left(incomplete.errors))
-              val errorDivs = incomplete.errors.toSeq.flatMap {
-                case (field, msgs) =>
+              val errorDivs =
+                incomplete.errors.toSeq.flatMap { case (field, msgs) =>
                   msgs.map(m => p(`class` := "form-error", text(s"$field: $m")))
-              }
+                }
               Response.html(
                 html(
                   head(meta(charset := "utf-8")),
@@ -70,8 +101,12 @@ object E2ETests extends TestSuite {
                     formTag(
                       method := "post",
                       action := "/",
+                      noValidate,
                       HtmlForm
-                        .draw[TestUserForm](incomplete.oldForm, incomplete.errors),
+                        .draw[TestUserForm](
+                          incomplete.oldForm,
+                          incomplete.errors
+                        ),
                       button(`type` := "submit", text("Submit"))
                     )
                   )
@@ -86,7 +121,9 @@ object E2ETests extends TestSuite {
                   body(
                     div(
                       id := "result",
-                      text(s"Success: ${user.username}, ${user.age}")
+                      text(
+                        s"Success: ${user.username}, ${user.age}, ${user.address.city}, ${user.address.street}"
+                      )
                     )
                   )
                 )
@@ -129,6 +166,8 @@ object E2ETests extends TestSuite {
       page.navigate(s"http://localhost:$port/")
       assert(page.locator("input[name=username]").count() == 1)
       assert(page.locator("input[name=age]").count() == 1)
+      assert(page.locator("input[name='address.city']").count() == 1)
+      assert(page.locator("input[name='address.street']").count() == 1)
       assert(page.locator("button[type=submit]").count() == 1)
       page.close()
     }
@@ -139,16 +178,22 @@ object E2ETests extends TestSuite {
       page.navigate(s"http://localhost:$port/")
       page.fill("input[name=username]", "Alice")
       page.fill("input[name=age]", "30")
+      page.fill("input[name='address.city']", "NYC")
+      page.fill("input[name='address.street']", "Main St")
       page.click("button[type=submit]")
       page.waitForLoadState()
       val bodyText = page.textContent("body")
       assert(bodyText.contains("Alice"))
       assert(bodyText.contains("30"))
+      assert(bodyText.contains("NYC"))
+      assert(bodyText.contains("Main St"))
       val result = lastDecodeResult.get()
       assert(result.isRight)
       val user = result.toOption.get
       assert(user.username == "Alice")
       assert(user.age == 30)
+      assert(user.address.city == "NYC")
+      assert(user.address.street == "Main St")
       page.close()
     }
 
@@ -158,6 +203,8 @@ object E2ETests extends TestSuite {
       page.navigate(s"http://localhost:$port/")
       page.fill("input[name=username]", "")
       page.fill("input[name=age]", "30")
+      page.fill("input[name='address.city']", "NYC")
+      page.fill("input[name='address.street']", "Main St")
       page.click("button[type=submit]")
       page.waitForLoadState()
       val bodyText = page.textContent("body")
@@ -166,6 +213,8 @@ object E2ETests extends TestSuite {
       val errors = result.swap.getOrElse(Map.empty)
       assert(errors("username") == Seq("Поле должно быть заполнено"))
       assert(!errors.contains("age"))
+      assert(!errors.contains("address.city"))
+      assert(!errors.contains("address.street"))
       page.close()
     }
 
@@ -175,6 +224,8 @@ object E2ETests extends TestSuite {
       page.navigate(s"http://localhost:$port/")
       page.fill("input[name=username]", "Alice")
       page.fill("input[name=age]", "")
+      page.fill("input[name='address.city']", "NYC")
+      page.fill("input[name='address.street']", "Main St")
       page.click("button[type=submit]")
       page.waitForLoadState()
       val bodyText = page.textContent("body")
@@ -182,6 +233,8 @@ object E2ETests extends TestSuite {
       val result = lastDecodeResult.get()
       val errors = result.swap.getOrElse(Map.empty)
       assert(errors("age") == Seq("Невозможно преобразовать в число"))
+      assert(!errors.contains("address.city"))
+      assert(!errors.contains("address.street"))
       page.close()
     }
   }
