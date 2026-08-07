@@ -34,8 +34,7 @@ object DecodeAndValidateTests extends TestSuite {
         label = "Login",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "Enter login",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     ),
     age = HtmlForm.FormSchema.Field(
@@ -54,8 +53,7 @@ object DecodeAndValidateTests extends TestSuite {
         label = "City",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "city",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     ),
     street = HtmlForm.FormSchema.Field(
@@ -63,8 +61,7 @@ object DecodeAndValidateTests extends TestSuite {
         label = "Street",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "street",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     )
   )
@@ -75,8 +72,7 @@ object DecodeAndValidateTests extends TestSuite {
         label = "Type",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "type",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     ),
     number = HtmlForm.FormSchema.Field(
@@ -84,8 +80,7 @@ object DecodeAndValidateTests extends TestSuite {
         label = "Number",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "number",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     )
   )
@@ -96,8 +91,7 @@ object DecodeAndValidateTests extends TestSuite {
         label = "Login",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "Enter login",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     ),
     address = HtmlForm.FormSchema.SubForm(
@@ -299,6 +293,250 @@ object DecodeAndValidateTests extends TestSuite {
         incomplete.errors("docs.0.typ") == Seq("Обязательное поле")
       )
       assert(incomplete.oldForm.isEmpty)
+    }
+
+    test("custom SubForm validator error appears at subform path") {
+      given RegForm[HtmlForm.FormSchema] = RegForm(
+        login = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Login",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "Enter login",
+            typeAttr = "text"
+          )
+        ),
+        address = HtmlForm.FormSchema.SubForm(
+          "Address",
+          summon[AddressF[HtmlForm.FormSchema]],
+          validator = Validator
+            .custom[AddressF[[T] =>> T]]("City and street cannot be the same")(
+              a => a.city != a.street
+            )
+            .toZIO
+        ),
+        docs = HtmlForm.FormSchema.RepeatedSubForm(
+          "Docs",
+          summon[DocF[HtmlForm.FormSchema]]
+        )
+      )
+
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "NYC")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("address") == Seq(
+          "City and street cannot be the same"
+        )
+      )
+      assert(!incomplete.errors.contains("address.city"))
+      assert(!incomplete.errors.contains("address.street"))
+      assert(incomplete.oldForm.isDefined)
+    }
+
+    test("RepeatedSubForm required=true, empty list fails validation") {
+      given RegForm[HtmlForm.FormSchema] = RegForm(
+        login = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Login",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "Enter login",
+            typeAttr = "text"
+          )
+        ),
+        address = HtmlForm.FormSchema.SubForm(
+          "Address",
+          summon[AddressF[HtmlForm.FormSchema]]
+        ),
+        docs = HtmlForm.FormSchema.RepeatedSubForm(
+          "Docs",
+          summon[DocF[HtmlForm.FormSchema]],
+          required = true
+        )
+      )
+
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("docs") == Seq("Добавьте минимум одно значение")
+      )
+    }
+
+    test("RepeatedSubForm required=true, non-empty list passes validation") {
+      given RegForm[HtmlForm.FormSchema] = RegForm(
+        login = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Login",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "Enter login",
+            typeAttr = "text"
+          )
+        ),
+        address = HtmlForm.FormSchema.SubForm(
+          "Address",
+          summon[AddressF[HtmlForm.FormSchema]]
+        ),
+        docs = HtmlForm.FormSchema.RepeatedSubForm(
+          "Docs",
+          summon[DocF[HtmlForm.FormSchema]],
+          required = true
+        )
+      )
+
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St"),
+        FormField.Simple("docs.0.typ", "passport"),
+        FormField.Simple("docs.0.number", "12345")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isRight)
+    }
+
+    test("custom RepeatedSubForm validator error appears at section path") {
+      given RegForm[HtmlForm.FormSchema] = RegForm(
+        login = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Login",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "Enter login",
+            typeAttr = "text"
+          )
+        ),
+        address = HtmlForm.FormSchema.SubForm(
+          "Address",
+          summon[AddressF[HtmlForm.FormSchema]]
+        ),
+        docs = HtmlForm.FormSchema.RepeatedSubForm(
+          "Docs",
+          summon[DocF[HtmlForm.FormSchema]],
+          validator = Validator
+            .custom[Seq[DocF[[T] =>> T]]]("Maximum 2 documents")(
+              _.length <= 2
+            )
+            .toZIO
+        )
+      )
+
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St"),
+        FormField.Simple("docs.0.typ", "passport"),
+        FormField.Simple("docs.0.number", "1"),
+        FormField.Simple("docs.1.typ", "visa"),
+        FormField.Simple("docs.1.number", "2"),
+        FormField.Simple("docs.2.typ", "id"),
+        FormField.Simple("docs.2.number", "3")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("docs") == Seq("Maximum 2 documents")
+      )
+      assert(incomplete.oldForm.isDefined)
+    }
+
+    test("custom RepeatedSubForm validator composes with required") {
+      given RegForm[HtmlForm.FormSchema] = RegForm(
+        login = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Login",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "Enter login",
+            typeAttr = "text"
+          )
+        ),
+        address = HtmlForm.FormSchema.SubForm(
+          "Address",
+          summon[AddressF[HtmlForm.FormSchema]]
+        ),
+        docs = HtmlForm.FormSchema.RepeatedSubForm(
+          "Docs",
+          summon[DocF[HtmlForm.FormSchema]],
+          required = true,
+          validator = Validator
+            .custom[Seq[DocF[[T] =>> T]]]("Maximum 2 documents")(
+              _.length <= 2
+            )
+            .toZIO
+        )
+      )
+
+      val form = Form(
+        FormField.Simple("login", "alice"),
+        FormField.Simple("address.city", "NYC"),
+        FormField.Simple("address.street", "Main St")
+      )
+      val result = run(HtmlForm.decodeAndValidate[RegForm](form))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      val errs = incomplete.errors("docs")
+      assert(errs.contains("Добавьте минимум одно значение"))
+    }
+
+    test("String field with required=false passes empty value") {
+      given AccountForm[HtmlForm.FormSchema] = AccountForm(
+        login = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Login",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "Enter login",
+            typeAttr = "text",
+            required = false
+          )
+        ),
+        age = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Age",
+            renderer = HtmlForm.intRenderable,
+            placeholderAttr = "Enter age",
+            typeAttr = "number"
+          )
+        )
+      )
+
+      val form = Form(
+        FormField.Simple("login", ""),
+        FormField.Simple("age", "30")
+      )
+      val result = run(HtmlForm.decodeAndValidate[AccountForm](form))
+      assert(result.isRight)
+    }
+
+    test("Option[String] field with required=true fails on None") {
+      case class OptForm[F[_]](opt: F[Option[String]])
+
+      given OptForm[HtmlForm.FormSchema] = OptForm(
+        opt = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Optional field",
+            renderer = HtmlForm.stringRenderable.optional,
+            placeholderAttr = "",
+            typeAttr = "text",
+            required = true
+          )
+        )
+      )
+
+      val result = run(HtmlForm.decodeAndValidate[OptForm](Form.empty))
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(
+        incomplete.errors("opt") == Seq("Обязательное поле")
+      )
     }
   }
 }

@@ -239,6 +239,27 @@ object ValidatorTests extends TestSuite {
       assert(v.validate(Some("abcd")).isEmpty)
     }
 
+    test("nonEmptySeq valid") {
+      assert(Validator.nonEmptySeq.validate(Seq(1, 2, 3)).isEmpty)
+    }
+
+    test("nonEmptySeq invalid") {
+      assert(
+        Validator.nonEmptySeq.validate(Seq.empty[Int]) == Seq(
+          "Добавьте минимум одно значение"
+        )
+      )
+    }
+
+    test("nonEmptySeq composed with another validator") {
+      val v = Validator.compose(
+        Validator.nonEmptySeq.asInstanceOf[Validator[Seq[Int]]],
+        Validator.custom[Seq[Int]]("Must have at least 3 items")(_.length >= 3)
+      )
+      val errors = v.validate(Seq(1))
+      assert(errors == Seq("Must have at least 3 items"))
+    }
+
     test("option composed with required fails on None") {
       val inner: Validator[Option[String]] = Validator.minLength(3).option
       val requiredString: Validator[Option[String]] =

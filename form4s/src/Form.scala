@@ -316,11 +316,15 @@ trait Form[Elem] {
         schema match
           case FormSchema.Field(schema) =>
             val requiredValidator: Validator[Gen] =
-              value.asInstanceOf[Gen] match {
-                case s: String =>
-                  Validator.nonEmpty.asInstanceOf[Validator[Gen]]
-                case _ => Validator.empty
-              }
+              if (!schema.required) Validator.empty
+              else
+                value.asInstanceOf[Gen] match {
+                  case _: String =>
+                    Validator.nonEmpty.asInstanceOf[Validator[Gen]]
+                  case _: Option[?] =>
+                    Validator.required.asInstanceOf[Validator[Gen]]
+                  case _ => Validator.empty
+                }
             ValidatorZIO
               .compose(schema.validator, requiredValidator.toZIO)
               .validate(value.asInstanceOf[Gen])

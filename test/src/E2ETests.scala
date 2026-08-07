@@ -26,8 +26,7 @@ object E2ETests extends TestSuite {
         label = "Username",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "Enter username",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     ),
     age = HtmlForm.FormSchema.Field(
@@ -50,8 +49,7 @@ object E2ETests extends TestSuite {
         label = "City",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "city",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     ),
     street = HtmlForm.FormSchema.Field(
@@ -59,8 +57,7 @@ object E2ETests extends TestSuite {
         label = "Street",
         renderer = HtmlForm.stringRenderable,
         placeholderAttr = "street",
-        typeAttr = "text",
-        validator = Validator.nonEmpty.toZIO
+        typeAttr = "text"
       )
     )
   )
