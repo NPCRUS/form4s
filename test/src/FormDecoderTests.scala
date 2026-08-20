@@ -582,13 +582,38 @@ object FormDecoderTests extends TestSuite {
       )
     }
 
-    test("decode missing subform reports error on subform field itself") {
+    test("decode missing subform propagates errors to its fields") {
       case class Address(city: String, street: String) derives FormDecoder
       case class Person(name: String, address: Address) derives FormDecoder
       val form = Form(FormField.Simple("name", "Alice"))
       val decoded = summon[FormDecoder[Person]].decode(form)
       assert(
-        decoded == Left(Seq(DecodingError("address", "Обязательное поле")))
+        decoded == Left(
+          Seq(
+            DecodingError("address.city", "Обязательное поле"),
+            DecodingError("address.street", "Обязательное поле")
+          )
+        )
+      )
+    }
+
+    test("decode missing subform of checkboxes defaults each field to false") {
+      case class Integrations(blizko: Boolean, yandexBusiness: Boolean)
+          derives FormDecoder
+      case class Settings(name: String, integrations: Integrations)
+          derives FormDecoder
+      val decoded = summon[FormDecoder[Settings]].decode(
+        Form(FormField.Simple("name", "10"))
+      )
+      assert(decoded == Right(Settings("10", Integrations(false, false))))
+    }
+
+    test("decode missing subform still reports required fields inside") {
+      case class Sub(flag: Boolean, name: String) derives FormDecoder
+      case class Outer(sub: Sub) derives FormDecoder
+      val decoded = summon[FormDecoder[Outer]].decode(Form())
+      assert(
+        decoded == Left(Seq(DecodingError("sub.name", "Обязательное поле")))
       )
     }
 

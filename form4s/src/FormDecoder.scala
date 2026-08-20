@@ -44,9 +44,11 @@ trait FormDecoder[T] { that =>
     */
   def decode(input: Form): Either[Seq[DecodingError], T]
 
-  /** Whether this decoder treats missing input as a valid empty value. When
-    * `true`, a missing field is decoded as the default empty value instead of
-    * producing a "required field" error. Defaults to `false`.
+  /** Whether this decoder handles a missing field by decoding its empty value
+    * rather than producing a "required field" error. Primitive optional
+    * decoders (`Boolean`, `Option`, `Seq`) are `true`; derived case classes are
+    * `true` because a missing sub-form recurses into its fields. Defaults to
+    * `false`.
     */
   def isOptional: Boolean = false
 
@@ -349,7 +351,9 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
     * filtering form fields by the parameter name (supporting dot-notation
     * nesting), then constructs the case class.
     *
-    * Missing non-optional fields produce a "required field" error.
+    * A missing field is decoded via its decoder's [[FormDecoder.isOptional]]:
+    * optional fields resolve to their empty value, while a missing nested
+    * sub-form recurses into its fields (so each field resolves independently).
     */
   override def join[T](caseClass: CaseClass[FormDecoder, T]): FormDecoder[T] =
     new FormDecoder[T] {
@@ -391,6 +395,8 @@ object FormDecoder extends AutoDerivation[FormDecoder] {
             caseClass.rawConstruct(values.reverse)
           }
       }
+
+      override def isOptional: Boolean = true
     }
 
   /** Magnolia auto-derivation for sealed traits. Supports parameterless enums
