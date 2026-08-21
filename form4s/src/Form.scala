@@ -106,11 +106,12 @@ trait Form[Elem] {
           errors: Seq[String]
       ): Elem =
         that.draw(
-          FieldSchema[T](
+          new FieldSchema[T](
             label = schema.label,
             renderer = that,
             placeholderAttr = schema.placeholderAttr,
             typeAttr = schema.typeAttr,
+            validator = Validator.empty[T].toZIO,
             required = false
           ),
           fieldName,
@@ -182,9 +183,28 @@ trait Form[Elem] {
       renderer: Renderable[T],
       placeholderAttr: String,
       typeAttr: String,
-      validator: ValidatorZIO[T] = Validator.empty[T].toZIO,
-      required: Boolean = defaultRequired[T]
+      validator: ValidatorZIO[T],
+      required: Boolean
   )
+
+  object FieldSchema {
+    inline def apply[T](
+        label: String,
+        renderer: Renderable[T],
+        placeholderAttr: String,
+        typeAttr: String,
+        validator: ValidatorZIO[T] = Validator.empty[T].toZIO,
+        required: Boolean | Null = null
+    ): FieldSchema[T] =
+      new FieldSchema(
+        label,
+        renderer,
+        placeholderAttr,
+        typeAttr,
+        validator,
+        if (required == null) defaultRequired[T] else required.nn
+      )
+  }
 
   /** Render the full form. Populates fields with old values (for re-display
     * after submission) and displays validation errors next to the relevant

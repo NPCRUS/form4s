@@ -516,7 +516,9 @@ object DecodeAndValidateTests extends TestSuite {
       assert(result.isRight)
     }
 
-    test("Option[String] field absent from body decodes to None without error") {
+    test(
+      "Option[String] field absent from body decodes to None without error"
+    ) {
       case class OptForm[F[_]](name: F[String], opt: F[Option[String]])
 
       given OptForm[HtmlForm.FormSchema] = OptForm(
