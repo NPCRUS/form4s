@@ -516,6 +516,34 @@ object DecodeAndValidateTests extends TestSuite {
       assert(result.isRight)
     }
 
+    test("Option[String] field absent from body decodes to None without error") {
+      case class OptForm[F[_]](name: F[String], opt: F[Option[String]])
+
+      given OptForm[HtmlForm.FormSchema] = OptForm(
+        name = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Name",
+            renderer = HtmlForm.stringRenderable,
+            placeholderAttr = "",
+            typeAttr = "text"
+          )
+        ),
+        opt = HtmlForm.FormSchema.Field(
+          HtmlForm.FieldSchema(
+            label = "Optional",
+            renderer = HtmlForm.stringRenderable.optional,
+            placeholderAttr = "",
+            typeAttr = "text"
+          )
+        )
+      )
+
+      val form = Form(FormField.Simple("name", "alice"))
+      val result = run(HtmlForm.decodeAndValidate[OptForm](form))
+      assert(result.isRight)
+      assert(result.toOption.get.opt == None)
+    }
+
     test("Option[String] field with required=true fails on None") {
       case class OptForm[F[_]](opt: F[Option[String]])
 

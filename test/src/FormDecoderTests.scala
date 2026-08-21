@@ -154,6 +154,14 @@ object FormDecoderTests extends TestSuite {
       assert(decoded == Right(OptionalField(Some("hello"))))
     }
 
+    test("decode case class with missing Option[String] field returns None") {
+      case class Mixed(required: String, optional: Option[String])
+          derives FormDecoder
+      val form = Form(FormField.Simple("required", "value"))
+      val decoded = summon[FormDecoder[Mixed]].decode(form)
+      assert(decoded == Right(Mixed("value", None)))
+    }
+
     test("FormDecoder optional field empty string") {
       case class OptionalField(value: Option[String]) derives FormDecoder
       val form = Form(FormField.Simple("value", ""))
