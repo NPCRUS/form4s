@@ -1,4 +1,4 @@
-package form4s2
+package form4s
 
 import zio.blocks.schema.{CompanionOptics, Lens}
 

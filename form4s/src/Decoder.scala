@@ -1,4 +1,4 @@
-package form4s2
+package form4s
 
 import zio.http.{Form, FormField}
 import java.time.LocalDateTime
