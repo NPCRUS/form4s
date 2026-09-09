@@ -6,10 +6,19 @@
       "url": "http://127.0.0.1:33215/mcp",
       "enabled": true,
     },
-    "browsermcp": {
+    "firefox-devtools": {
       "type": "local",
-      "command": ["npx", "@browsermcp/mcp@latest"],
-      "enabled": true
-    }
+      "command": [
+        "npx",
+        "-y",
+        "@mozilla/firefox-devtools-mcp@latest",
+        "--headless",
+        "--viewport",
+        "1920x1080",
+        "--start-url",
+        "http://localhost:8080"
+      ],
+      "enabled": true,
+    },
   },
 }
