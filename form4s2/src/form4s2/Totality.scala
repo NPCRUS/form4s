@@ -2,13 +2,17 @@ package form4s2
 
 import scala.quoted.*
 
-/** Extracts the compile-time literal field name from a `Drawn[S, N]`. */
+/** Extracts the compile-time literal field name from a `Drawn[S, N, E]`. */
 type NameOf[X] = X match
-  case Drawn[s, n] => n
+  case Drawn[s, n, ?] => n
 
-/** Extracts the source type from a `Drawn[S, N]`. */
+/** Extracts the source type from a `Drawn[S, N, E]`. */
 type SrcOf[X] = X match
-  case Drawn[s, ?] => s
+  case Drawn[s, ?, ?] => s
+
+/** Extracts the output element type from a `Drawn[S, N, E]`. */
+type ElemOf[X] = X match
+  case Drawn[s, ?, e] => e
 
 /** All field names drawn by a tuple of `Drawn` values. */
 type Names[T <: Tuple] = Tuple.Map[T, NameOf]
@@ -16,6 +20,10 @@ type Names[T <: Tuple] = Tuple.Map[T, NameOf]
 /** The source type shared by a tuple of `Drawn` values (taken from the head).
   */
 type Src[T <: Tuple] = SrcOf[Tuple.Head[T]]
+
+/** The output element type of a tuple of `Drawn` values (taken from the head).
+  */
+type Out[T <: Tuple] = ElemOf[Tuple.Head[T]]
 
 /** Compile-time check that `Drawn` field names cover `Labels` exactly (no
   * missing, duplicated, or unknown fields). Fails compilation with a precise

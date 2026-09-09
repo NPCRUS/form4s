@@ -27,31 +27,62 @@ object Reg extends FormFields[Reg]:
 
 object Fixtures:
 
-  def textInput(ctx: RenderContext[?]): Dom =
-    input(name := ctx.path, `type` := "text")
+  // ---- user-side rendering helpers (library knows nothing about these) ----
 
-  def numberInput(ctx: RenderContext[?]): Dom =
-    input(name := ctx.path, `type` := "number")
+  def textInput(ctx: RenderContext[?]): List[Dom] =
+    List(input(name := ctx.path, `type` := "text"))
 
-  val addressForm: FormRenderer[Address] =
+  def numberInput(ctx: RenderContext[?]): List[Dom] =
+    List(input(name := ctx.path, `type` := "number"))
+
+  def section(label: String)(children: List[Dom]): List[Dom] =
+    List(fieldset(legend(text(label)), children))
+
+  def repeatedSection(
+      label: String,
+      items: List[Dom],
+      tpl: List[Dom]
+  ): List[Dom] =
+    List(
+      fieldset(
+        legend(text(label)),
+        items,
+        template(tpl),
+        button(`type` := "button", text("Add"))
+      )
+    )
+
+  // ---- forms ----
+
+  val addressForm: FormRenderer[Address, List[Dom]] =
     draw(
       drawField(Address.city)(ctx => textInput(ctx)),
       drawField(Address.street)(ctx => textInput(ctx))
-    )
+    )(_ ++ _)
 
-  val documentForm: FormRenderer[Document] =
+  val documentForm: FormRenderer[Document, List[Dom]] =
     draw(
       drawField(Document.typ)(ctx => textInput(ctx)),
       drawField(Document.number)(ctx => textInput(ctx))
-    )
+    )(_ ++ _)
 
-  val regForm: FormRenderer[Reg] =
+  def docsSection(ctx: RenderContext[Seq[Document]]): List[Dom] =
+    val items = ctx.oldValue.getOrElse(Seq.empty)
+    val rendered = items.zipWithIndex.flatMap { (doc, i) =>
+      documentForm(RenderContext(ctx.at(i), Some(doc), ctx.errors))
+    }.toList
+    val tpl = documentForm(RenderContext(ctx.at(0), None, Map.empty))
+    repeatedSection("Docs", rendered, tpl)
+
+  def regForm(isEdit: Boolean): FormRenderer[Reg, List[Dom]] =
     draw(
       drawField(Reg.login)(ctx => textInput(ctx)),
-      drawField(Reg.age)(ctx => numberInput(ctx)),
-      subForm(Reg.address, "Address")(addressForm),
-      repeated(Reg.docs, "Docs")(documentForm)
-    )
+      drawField(Reg.age)(ctx => if isEdit then numberInput(ctx) else Nil),
+      drawField(Reg.address)(ctx => section("Address")(addressForm(ctx))),
+      drawField(Reg.docs)(ctx => docsSection(ctx))
+    )(_ ++ _)
+
+  // ---- decode / validate ----
 
   given FormDecoder[Reg] = FormDecoder.derived
 
@@ -65,16 +96,18 @@ object DecodeValidateRenderTests extends TestSuite:
 
   import Fixtures.{*, given}
 
+  def html(fields: List[Dom]): String = fields.map(_.render).mkString
+
   val tests = Tests {
 
     test("renders every field with lens-derived names") {
-      val html = renderForm(regForm, None).render
-      assert(html.contains("name=\"login\""))
-      assert(html.contains("name=\"age\""))
-      assert(html.contains("name=\"address.city\""))
-      assert(html.contains("name=\"address.street\""))
-      assert(html.contains("name=\"docs.0.typ\""))
-      assert(html.contains("name=\"docs.0.number\""))
+      val out = html(renderForm(regForm(true), None))
+      assert(out.contains("name=\"login\""))
+      assert(out.contains("name=\"age\""))
+      assert(out.contains("name=\"address.city\""))
+      assert(out.contains("name=\"address.street\""))
+      assert(out.contains("name=\"docs.0.typ\""))
+      assert(out.contains("name=\"docs.0.number\""))
     }
 
     test("valid input decodes and validates") {
@@ -204,20 +237,11 @@ object DecodeValidateRenderTests extends TestSuite:
       assert(incomplete.errors("docs") == Seq("Добавьте минимум одно значение"))
     }
 
-    test("conditional rendering via ambient env") {
-      val viewOnly: FormRenderer[Reg] =
-        draw(
-          drawField(Reg.login)(ctx => textInput(ctx)),
-          drawField(Reg.age)(ctx => numberInput(ctx))
-            .showIf(_.env.mode == RenderEnv.Mode.Edit),
-          subForm(Reg.address, "Address")(addressForm),
-          repeated(Reg.docs, "Docs")(documentForm)
-        )
-
-      val editHtml = renderForm(viewOnly, None).render
+    test("conditional rendering via captured flag") {
+      val editHtml = html(renderForm(regForm(true), None))
       assert(editHtml.contains("name=\"age\""))
 
-      val viewHtml = renderForm(viewOnly, None, env = RenderEnv.view).render
+      val viewHtml = html(renderForm(regForm(false), None))
       assert(!viewHtml.contains("name=\"age\""))
       assert(viewHtml.contains("name=\"login\""))
     }
