@@ -58,8 +58,14 @@ object FieldMacro:
         case Block(List(DefDef(_, _, _, Some(body))), _) => loop(body)
         case Lambda(_, body)                             => loop(body)
         case Typed(e, _)                                 => loop(e)
-        case Select(_, name)                             => name
-        case other                                       =>
+        case Select(qualifier, name)                     =>
+          qualifier match
+            case _: Ident => name
+            case _        =>
+              report.errorAndAbort(
+                s"Expected a simple field selector like _.name, got a nested path '...$name'. Use field(_.parent) and compose fields with '/'."
+              )
+        case other =>
           report.errorAndAbort(
             s"Expected a simple field selector like _.name, got '${other.show}'"
           )

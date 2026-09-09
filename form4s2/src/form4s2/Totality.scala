@@ -42,24 +42,21 @@ private object TotalityMacros:
     val labels = constStrings(TypeRepr.of[Labels])
     val drawn = constStrings(TypeRepr.of[DrawnNames])
 
-    val labelCounts = labels.groupBy(identity).view.mapValues(_.size).toMap
-    val drawnCounts = drawn.groupBy(identity).view.mapValues(_.size).toMap
+    val labelSet = labels.toSet
 
-    val missing = labelCounts.toList.flatMap { case (n, c) =>
-      val d = drawnCounts.getOrElse(n, 0)
-      if d < c then List(s"'$n' (expected $c, drew $d)") else Nil
-    }.sorted
+    val missing = labelSet.diff(drawn.toSet).toList.sorted.map(n => s"'$n'")
 
-    val duplicated = drawnCounts.toList.collect {
-      case (n, c) if labelCounts.contains(n) && c > labelCounts(n) =>
-        s"'$n' (drew $c, expected ${labelCounts(n)})"
-    }.sorted
-
-    val unknown = drawn
-      .filterNot(labelCounts.contains)
-      .distinct
+    val duplicated = drawn
+      .groupBy(identity)
+      .collect {
+        case (n, xs) if xs.size > 1 && labelSet.contains(n) => n
+      }
+      .toList
       .sorted
       .map(n => s"'$n'")
+
+    val unknown =
+      drawn.filterNot(labelSet.contains).distinct.sorted.map(n => s"'$n'")
 
     if missing.nonEmpty || duplicated.nonEmpty || unknown.nonEmpty then
       val parts = List(
