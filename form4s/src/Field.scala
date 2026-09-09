@@ -10,7 +10,7 @@ trait Field[S, A]:
   def get(s: S): A
 
 /** A leaf field of a record `S`, tagged with the compile-time literal field
-  * name `N`. `N` is used by the totality check in [[form4s2.draw]].
+  * name `N`. `N` is used by the totality check in [[form4s.draw]].
   */
 final class LeafField[S, A, N <: String](
     val lens: Lens[S, A],
@@ -41,4 +41,4 @@ object Path:
   */
 trait FormFields[S] extends CompanionOptics[S]:
   transparent inline def field[A](inline sel: S => A): LeafField[S, A, ?] =
-    ${ form4s2.FieldMacro.fieldImpl[S, A]('sel) }
+    ${ form4s.FieldMacro.fieldImpl[S, A]('sel) }

@@ -11,6 +11,18 @@ trait Validator[A]:
 
   def contramap[B](f: B => A): Validator[B] = b => validate(f(b))
 
+  /** Transform the input before validation (identity by default; useful for
+    * trimming/normalisation).
+    */
+  def map(f: A => A): Validator[A] = a => validate(f(a))
+
+  /** Create a validator for [[Option]] that only checks the value when present.
+    */
+  def option: Validator[Option[A]] = opt => opt.fold(Seq.empty)(validate)
+
+  /** Lift this pure validator into an effectful [[ValidatorZIO]]. */
+  def toZIO: ValidatorZIO[A] = ValidatorZIO.fromPure(this)
+
 object Validator:
 
   def compose[A](vs: Validator[A]*): Validator[A] =
@@ -27,7 +39,7 @@ object Validator:
   def nonEmptySeq[A]: Validator[Seq[A]] = in =>
     if in.isEmpty then Seq("Добавьте минимум одно значение") else Seq.empty
 
-  val required: Validator[Option[?]] = in =>
+  def required[A]: Validator[Option[A]] = in =>
     if in.isEmpty then Seq("Обязательное поле") else Seq.empty
 
   def minLength(n: Int): Validator[String] = in =>
@@ -63,22 +75,49 @@ object Validator:
     if """^https?://[^\s]+""".r.matches(in) then Seq.empty
     else Seq("Некорректный URL")
 
-/** A validation rule attached to a path: run on the whole model, errors keyed
-  * by `path`.
+/** A validation rule: run over the whole model, producing a map of error path →
+  * messages.
   */
-final case class Rule[S](path: String, validate: S => Seq[String])
+final case class Rule[S](validate: S => Map[String, Seq[String]])
 
 /** A field-level rule: validate the value focused by `field`, keyed by the
   * field's name (derived from the lens).
   */
 def rule[S, A](field: Field[S, A], v: Validator[A]): Rule[S] =
-  Rule(field.name, s => v.validate(field.get(s)))
+  Rule(s =>
+    v.validate(field.get(s)) match
+      case errs if errs.nonEmpty => Map(field.name -> errs)
+      case _                     => Map.empty
+  )
 
 /** A whole-model rule (e.g. cross-field consistency), optionally keyed at a
   * `path` (default: the root form).
   */
 def whole[S](v: Validator[S], path: String = ""): Rule[S] =
-  Rule(path, v.validate)
+  Rule(s =>
+    v.validate(s) match
+      case errs if errs.nonEmpty => Map(path -> errs)
+      case _                     => Map.empty
+  )
+
+/** A repeated-subform rule: validate every element of a `Seq` field with a
+  * sub-[[Validation]], prefixing error keys with `field.INDEX.`.
+  */
+def ruleEach[S, A](
+    field: Field[S, Seq[A]],
+    validation: Validation[A]
+): Rule[S] =
+  Rule(s =>
+    field
+      .get(s)
+      .zipWithIndex
+      .flatMap { (a, i) =>
+        validation.run(a).map { case (k, errs) =>
+          (s"${field.name}.$i.$k", errs)
+        }
+      }
+      .toMap
+  )
 
 /** A set of rules, run over a model to produce a path → errors map. */
 final case class Validation[S](rules: List[Rule[S]]):
@@ -86,13 +125,11 @@ final case class Validation[S](rules: List[Rule[S]]):
     Validation(rules ++ that.rules)
 
   def run(s: S): Map[String, Seq[String]] =
-    rules
-      .flatMap(r =>
-        r.validate(s) match
-          case errs if errs.nonEmpty => Seq(r.path -> errs)
-          case _                     => Seq.empty
-      )
-      .toMap
+    rules.foldLeft(Map.empty[String, Seq[String]]) { (acc, r) =>
+      r.validate(s).foldLeft(acc) { case (a, (k, errs)) =>
+        a.updated(k, a.getOrElse(k, Seq.empty) ++ errs)
+      }
+    }
 
 object Validation:
   def apply[S](rules: Rule[S]*): Validation[S] = Validation(rules.toList)

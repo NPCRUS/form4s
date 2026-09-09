@@ -21,30 +21,10 @@ object form4s extends ScalaModule with PublishModule {
   )
 
   def mvnDeps = Seq(
-    mvn"com.softwaremill.magnolia1_3::magnolia:1.3.21",
-    mvn"dev.zio::zio:2.1.26",
-    mvn"dev.zio::zio-http:3.11.2"
-  )
-}
-
-object demo extends ScalaModule {
-  def scalaVersion = "3.8.4"
-  def moduleDeps = Seq(form4s)
-}
-
-object form4s2 extends ScalaModule {
-  def scalaVersion = "3.8.4"
-  def mvnDeps = Seq(
     mvn"dev.zio::zio-blocks-schema:0.0.51",
     mvn"dev.zio::zio:2.1.26",
     mvn"dev.zio::zio-http:3.11.2"
   )
-
-  object test extends ScalaModule with TestModule.Utest {
-    def scalaVersion = "3.8.4"
-    def moduleDeps = Seq(form4s2)
-    def mvnDeps = Seq(mvn"com.lihaoyi::utest:0.8.9")
-  }
 }
 
 object test extends ScalaModule with TestModule.Utest {
@@ -56,7 +36,7 @@ object test extends ScalaModule with TestModule.Utest {
   )
 }
 
-object example extends ScalaModule {
+object demo extends ScalaModule {
   def scalaVersion = "3.8.4"
-  def moduleDeps = Seq(form4s2)
+  def moduleDeps = Seq(form4s)
 }

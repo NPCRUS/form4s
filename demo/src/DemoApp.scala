@@ -1,6 +1,6 @@
-package example
+package demo
 
-import form4s2.*
+import form4s.*
 import zio.*
 import zio.http.*
 import zio.http.template2.{form as formTag, *}

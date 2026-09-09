@@ -234,7 +234,7 @@ object ValidatorTests extends TestSuite {
     test("option composed with required passes Some") {
       val inner: Validator[Option[String]] = Validator.minLength(3).option
       val requiredString: Validator[Option[String]] =
-        Validator.required.asInstanceOf[Validator[Option[String]]]
+        Validator.required[String]
       val v = Validator.compose(inner, requiredString)
       assert(v.validate(Some("abcd")).isEmpty)
     }
@@ -253,7 +253,7 @@ object ValidatorTests extends TestSuite {
 
     test("nonEmptySeq composed with another validator") {
       val v = Validator.compose(
-        Validator.nonEmptySeq.asInstanceOf[Validator[Seq[Int]]],
+        Validator.nonEmptySeq[Int],
         Validator.custom[Seq[Int]]("Must have at least 3 items")(_.length >= 3)
       )
       val errors = v.validate(Seq(1))
@@ -263,7 +263,7 @@ object ValidatorTests extends TestSuite {
     test("option composed with required fails on None") {
       val inner: Validator[Option[String]] = Validator.minLength(3).option
       val requiredString: Validator[Option[String]] =
-        Validator.required.asInstanceOf[Validator[Option[String]]]
+        Validator.required[String]
       val v = Validator.compose(inner, requiredString)
       assert(v.validate(None) == Seq("Обязательное поле"))
     }

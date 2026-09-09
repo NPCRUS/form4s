@@ -2,68 +2,59 @@ package form4s
 
 import utest.*
 import zio.*
+import zio.blocks.schema.Schema
 import zio.http.*
 import zio.http.template2.{form as formTag, *}
 import com.microsoft.playwright.{Playwright, Browser, BrowserType}
 import java.util.concurrent.atomic.AtomicReference
 
-case class TestUserForm[F[_]](
-    username: F[String],
-    age: F[Int],
-    address: F[AddressF[F]]
-)
+case class TestAddress(city: String, street: String)
+object TestAddress extends AutoFields[TestAddress]:
+  given Schema[TestAddress] = Schema.derived
 
-object E2ETests extends TestSuite {
+case class TestUser(username: String, age: Int, address: TestAddress)
+object TestUser extends AutoFields[TestUser]:
+  given Schema[TestUser] = Schema.derived
+
+object E2ETests extends TestSuite:
   val port = 9876
 
-  type TestUserFormData = TestUserForm[[T] =>> T]
   val lastDecodeResult =
-    new AtomicReference[Either[Map[String, Seq[String]], TestUserFormData]]
+    new AtomicReference[Either[Map[String, Seq[String]], TestUser]]
 
-  given TestUserForm[HtmlForm.FormSchema] = TestUserForm(
-    username = HtmlForm.FormSchema.Field(
-      HtmlForm.FieldSchema(
-        label = "Username",
-        renderer = HtmlForm.stringRenderable,
-        placeholderAttr = "Enter username",
-        typeAttr = "text"
-      )
-    ),
-    age = HtmlForm.FormSchema.Field(
-      HtmlForm.FieldSchema(
-        label = "Age",
-        renderer = HtmlForm.intRenderable,
-        placeholderAttr = "Enter age",
-        typeAttr = "number"
-      )
-    ),
-    address = HtmlForm.FormSchema.SubForm(
-      "Address",
-      addressSchema
-    )
+  given FormDecoder[TestUser] = FormDecoder.derived
+
+  given Validation[TestUser] = Validation(
+    rule(TestUser.username, Validator.nonEmpty)
   )
 
-  private def addressSchema: AddressF[HtmlForm.FormSchema] = AddressF(
-    city = HtmlForm.FormSchema.Field(
-      HtmlForm.FieldSchema(
-        label = "City",
-        renderer = HtmlForm.stringRenderable,
-        placeholderAttr = "city",
-        typeAttr = "text"
-      )
-    ),
-    street = HtmlForm.FormSchema.Field(
-      HtmlForm.FieldSchema(
-        label = "Street",
-        renderer = HtmlForm.stringRenderable,
-        placeholderAttr = "street",
-        typeAttr = "text"
-      )
-    )
-  )
+  def textInput(ctx: RenderContext[?]): List[Dom] =
+    List(input(name := ctx.path, `type` := "text"))
+
+  def numberInput(ctx: RenderContext[?]): List[Dom] =
+    List(input(name := ctx.path, `type` := "number"))
+
+  val addressForm: FormRenderer[TestAddress, List[Dom]] =
+    draw(
+      drawField(TestAddress.city)(ctx => textInput(ctx)),
+      drawField(TestAddress.street)(ctx => textInput(ctx))
+    )(_ ++ _)
+
+  val userForm: FormRenderer[TestUser, List[Dom]] =
+    draw(
+      drawField(TestUser.username)(ctx => textInput(ctx)),
+      drawField(TestUser.age)(ctx => numberInput(ctx)),
+      drawField(TestUser.address)(ctx => addressForm(ctx))
+    )(_ ++ _)
+
+  def renderFormContent(
+      old: Option[TestUser],
+      errors: Map[String, Seq[String]]
+  ): List[Dom] = renderForm(userForm, old, errors)
 
   val routes = Routes(
     Method.GET / "" -> handler {
+      val content = renderFormContent(None, Map.empty)
       Response.html(
         html(
           head(meta(charset := "utf-8")),
@@ -72,7 +63,7 @@ object E2ETests extends TestSuite {
               method := "post",
               action := "/",
               noValidate,
-              HtmlForm.draw[TestUserForm](None, Map.empty),
+              content,
               button(`type` := "submit", text("Submit"))
             )
           )
@@ -80,53 +71,46 @@ object E2ETests extends TestSuite {
       )
     },
     Method.POST / "" -> handler { (req: Request) =>
-      req.body.asURLEncodedForm.flatMap { formData =>
-        HtmlForm
-          .decodeAndValidate[TestUserForm](formData)
-          .fold(
-            incomplete => {
-              lastDecodeResult.set(Left(incomplete.errors))
-              val errorDivs =
-                incomplete.errors.toSeq.flatMap { case (field, msgs) =>
-                  msgs.map(m => p(`class` := "form-error", text(s"$field: $m")))
-                }
-              Response.html(
-                html(
-                  head(meta(charset := "utf-8")),
-                  body(
-                    div(id := "errors", errorDivs),
-                    formTag(
-                      method := "post",
-                      action := "/",
-                      noValidate,
-                      HtmlForm
-                        .draw[TestUserForm](
-                          incomplete.oldForm,
-                          incomplete.errors
-                        ),
-                      button(`type` := "submit", text("Submit"))
+      req.body.asURLEncodedForm.map { formData =>
+        decodeAndValidate[TestUser](formData) match
+          case Left(incomplete) =>
+            lastDecodeResult.set(Left(incomplete.errors))
+            val errorDivs =
+              incomplete.errors.toSeq.flatMap { case (field, msgs) =>
+                msgs.map(m => p(`class` := "form-error", text(s"$field: $m")))
+              }
+            val content =
+              renderFormContent(incomplete.oldForm, incomplete.errors)
+            Response.html(
+              html(
+                head(meta(charset := "utf-8")),
+                body(
+                  div(id := "errors", errorDivs),
+                  formTag(
+                    method := "post",
+                    action := "/",
+                    noValidate,
+                    content,
+                    button(`type` := "submit", text("Submit"))
+                  )
+                )
+              )
+            )
+          case Right(user) =>
+            lastDecodeResult.set(Right(user))
+            Response.html(
+              html(
+                head(meta(charset := "utf-8")),
+                body(
+                  div(
+                    id := "result",
+                    text(
+                      s"Success: ${user.username}, ${user.age}, ${user.address.city}, ${user.address.street}"
                     )
                   )
                 )
               )
-            },
-            user => {
-              lastDecodeResult.set(Right(user))
-              Response.html(
-                html(
-                  head(meta(charset := "utf-8")),
-                  body(
-                    div(
-                      id := "result",
-                      text(
-                        s"Success: ${user.username}, ${user.age}, ${user.address.city}, ${user.address.street}"
-                      )
-                    )
-                  )
-                )
-              )
-            }
-          )
+            )
       }
     }
   )
@@ -235,4 +219,3 @@ object E2ETests extends TestSuite {
       page.close()
     }
   }
-}

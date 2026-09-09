@@ -30,7 +30,7 @@ type Out[T <: Tuple] = ElemOf[Tuple.Head[T]]
   * message otherwise.
   */
 inline def checkTotality[Labels <: Tuple, DrawnNames <: Tuple]: Unit =
-  ${ form4s2.TotalityMacros.checkImpl[Labels, DrawnNames] }
+  ${ form4s.TotalityMacros.checkImpl[Labels, DrawnNames] }
 
 private object TotalityMacros:
 

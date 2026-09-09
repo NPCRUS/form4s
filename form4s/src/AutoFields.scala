@@ -1,4 +1,4 @@
-package form4
+package form4s
 
 import zio.blocks.schema.Schema
 
@@ -45,4 +45,4 @@ trait FieldsFor[S]:
 
 object FieldsFor:
   transparent inline given derived[S](using schema: Schema[S]): FieldsFor[S] =
-    ${ form4s2.AutoFieldsMacro.fieldsForImpl[S]('schema) }
+    ${ form4s.AutoFieldsMacro.fieldsForImpl[S]('schema) }

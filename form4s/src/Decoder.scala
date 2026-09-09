@@ -79,6 +79,14 @@ trait FormDecoder[A]:
   def decode(form: Form): Either[Seq[DecodingError], A]
   def isOptional: Boolean = false
 
+  /** Functor map: transform the decoded value. */
+  def map[U](f: A => U): FormDecoder[U] =
+    val that = this
+    new FormDecoder[U]:
+      def decode(form: Form): Either[Seq[DecodingError], U] =
+        that.decode(form).map(f)
+      override def isOptional: Boolean = that.isOptional
+
 object FormDecoder:
 
   /** Build a leaf decoder from a [[FieldDecoder]] over the first string value.
@@ -172,6 +180,13 @@ object FormDecoder:
         else Left(result.collect { case Left(e) => e }.flatten.toSeq)
 
       override def isOptional: Boolean = true
+
+  given eitherDecoder[A, B](using
+      decA: FormDecoder[A],
+      decB: FormDecoder[B]
+  ): FormDecoder[Either[A, B]] = new FormDecoder[Either[A, B]]:
+    def decode(form: Form): Either[Seq[DecodingError], Either[A, B]] =
+      decA.decode(form).map(Left(_)).orElse(decB.decode(form).map(Right(_)))
 
   /** Mirror-based auto-derivation for case classes. */
   inline given derived[A <: Product](using
