@@ -29,17 +29,13 @@ object Role:
 
 case class Address(city: String, street: String)
 
-object Address extends FormFields[Address]:
+object Address extends AutoFields[Address]:
   given Schema[Address] = Schema.derived
-  val city = field(_.city)
-  val street = field(_.street)
 
 case class Document(typ: String, number: String)
 
-object Document extends FormFields[Document]:
+object Document extends AutoFields[Document]:
   given Schema[Document] = Schema.derived
-  val typ = field(_.typ)
-  val number = field(_.number)
 
 case class Registration(
     username: String,
@@ -54,15 +50,5 @@ case class Registration(
     documents: Seq[Document]
 )
 
-object Registration extends FormFields[Registration]:
+object Registration extends AutoFields[Registration]:
   given Schema[Registration] = Schema.derived
-  val username = field(_.username)
-  val email = field(_.email)
-  val age = field(_.age)
-  val score = field(_.score)
-  val referralId = field(_.referralId)
-  val role = field(_.role)
-  val bio = field(_.bio)
-  val agree = field(_.agree)
-  val address = field(_.address)
-  val documents = field(_.documents)
