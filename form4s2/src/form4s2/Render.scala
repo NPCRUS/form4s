@@ -1,5 +1,7 @@
 package form4s2
 
+import zio.http.template2.{Dom, Modifier}
+
 import scala.deriving.Mirror
 
 /** Ambient, user-extensible render context. Subclass to add e.g. auth, locale,
@@ -36,23 +38,23 @@ final case class RenderContext[A](
   */
 final class Drawn[S, N <: String](
     val name: String,
-    val step: RenderContext[S] => Elem
+    val step: RenderContext[S] => Dom
 ):
-  def render(ctx: RenderContext[S]): Elem = step(ctx)
+  def render(ctx: RenderContext[S]): Dom = step(ctx)
 
   /** Conditionally render this field based on its context. */
   def showIf(p: RenderContext[S] => Boolean): Drawn[S, N] =
-    new Drawn[S, N](name, ctx => if p(ctx) then step(ctx) else Elem.empty)
+    new Drawn[S, N](name, ctx => if p(ctx) then step(ctx) else Dom.empty)
 
   /** Never render this field (still declared for totality). */
-  def hide: Drawn[S, N] = new Drawn[S, N](name, _ => Elem.empty)
+  def hide: Drawn[S, N] = new Drawn[S, N](name, _ => Dom.empty)
 
-/** A rendered form for a record `S`: a function from context to `Elem`. */
-final class FormRenderer[S](val render: RenderContext[S] => Elem):
-  def apply(ctx: RenderContext[S]): Elem = render(ctx)
+/** A rendered form for a record `S`: a function from context to `Dom`. */
+final class FormRenderer[S](val render: RenderContext[S] => Dom):
+  def apply(ctx: RenderContext[S]): Dom = render(ctx)
 
 object FormRenderer:
-  def apply[S](f: RenderContext[S] => Elem): FormRenderer[S] = new FormRenderer(
+  def apply[S](f: RenderContext[S] => Dom): FormRenderer[S] = new FormRenderer(
     f
   )
 
@@ -61,7 +63,7 @@ object FormRenderer:
   * path, old value, and errors.
   */
 inline def drawField[S, A, N <: String](f: LeafField[S, A, N])(
-    render: RenderContext[A] => Elem
+    render: RenderContext[A] => Dom
 ): Drawn[S, N] =
   new Drawn[S, N](
     f.name,
@@ -89,15 +91,9 @@ inline def subForm[S, A, N <: String](
       val childPath = ctx.child(f.name)
       val childCtx =
         RenderContext(childPath, ctx.oldValue.map(f.get), ctx.errors, ctx.env)
-      val errs = childCtx.error
-        .map(e => Elem.node("span", List("class" -> "error"))(Elem.text(e)))
-        .toList
-      Elem.Node(
-        "fieldset",
-        Nil,
-        Elem.node("legend")(Elem.text(label)) :: errs ::: List(
-          inner.render(childCtx)
-        )
+      val errs = childCtx.error.map(err)
+      el("fieldset")(
+        (Seq(el("legend")(Dom.text(label)), inner.render(childCtx)) ++ errs)*
       )
   )
 
@@ -119,24 +115,23 @@ inline def repeated[S, A, N <: String](
       val rendered = items.zipWithIndex.map { (item, i) =>
         val childCtx =
           RenderContext(s"$basePath.$i", Some(item), ctx.errors, ctx.env)
-        Elem.node("div", List("data-item" -> ""))(inner.render(childCtx))
-      }.toList
+        el("div", List("data-item" -> ""))(inner.render(childCtx))
+      }
 
       val tplCtx =
         RenderContext(s"$basePath.0", Option.empty[A], Map.empty, ctx.env)
-      val template = Elem.node("template")(inner.render(tplCtx))
+      val template = el("template")(inner.render(tplCtx))
 
-      val errs = sectionErrors
-        .map(e => Elem.node("span", List("class" -> "error"))(Elem.text(e)))
-        .toList
-
-      Elem.Node(
-        "fieldset",
-        Nil,
-        Elem.node("legend")(Elem.text(label)) :: errs ::: rendered ::: List(
-          template,
-          Elem.node("button", List("type" -> "button"))(Elem.text("Add"))
-        )
+      el("fieldset")(
+        (
+          Seq(el("legend")(Dom.text(label))) ++
+            sectionErrors.map(err) ++
+            rendered ++
+            Seq(
+              template,
+              el("button", List("type" -> "button"))(Dom.text("Add"))
+            )
+        )*
       )
   )
 
@@ -147,9 +142,9 @@ inline def draw[T <: Tuple](fields: T)(using
     m: Mirror.ProductOf[Src[T]]
 ): FormRenderer[Src[T]] =
   checkTotality[m.MirroredElemLabels, Names[T]]
-  val steps: List[RenderContext[Src[T]] => Elem] =
+  val steps: List[RenderContext[Src[T]] => Dom] =
     fields.toList.map(f => f.asInstanceOf[Drawn[Src[T], ?]].step)
-  FormRenderer[Src[T]](ctx => Elem.fragment(steps.map(_(ctx))))
+  FormRenderer[Src[T]](ctx => Dom.fragment(steps.map(_(ctx))*))
 
 /** Render a form at the top level, supplying old values and errors. */
 def renderForm[S](
@@ -157,5 +152,15 @@ def renderForm[S](
     oldValue: Option[S] = None,
     errors: Map[String, Seq[String]] = Map.empty,
     env: RenderEnv = RenderEnv.empty
-): Elem =
+): Dom =
   form.render(RenderContext("", oldValue, errors, env))
+
+private def el(tag: String, attrs: List[(String, String)] = Nil)(
+    children: Dom*
+): Dom =
+  val modifiers: List[Modifier] =
+    attrs.map((k, v) => Dom.attr(k, v): Modifier) ++ children
+  Dom.element(tag).apply(modifiers)
+
+private def err(message: String): Dom =
+  el("span", List("class" -> "error"))(Dom.text(message))

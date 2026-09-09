@@ -3,6 +3,7 @@ package form4s2
 import utest.*
 import zio.blocks.schema.Schema
 import zio.http.{Form, FormField}
+import zio.http.template2.*
 
 case class Address(city: String, street: String)
 object Address extends FormFields[Address]:
@@ -25,25 +26,29 @@ object Reg extends FormFields[Reg]:
   val docs = field(_.docs)
 
 object Fixtures:
-  def input(ctx: RenderContext[?], tpe: String): Elem =
-    Elem.node("input", List("name" -> ctx.path, "type" -> tpe))()
+
+  def textInput(ctx: RenderContext[?]): Dom =
+    input(name := ctx.path, `type` := "text")
+
+  def numberInput(ctx: RenderContext[?]): Dom =
+    input(name := ctx.path, `type` := "number")
 
   val addressForm: FormRenderer[Address] =
     draw(
-      drawField(Address.city)(ctx => input(ctx, "text")),
-      drawField(Address.street)(ctx => input(ctx, "text"))
+      drawField(Address.city)(ctx => textInput(ctx)),
+      drawField(Address.street)(ctx => textInput(ctx))
     )
 
   val documentForm: FormRenderer[Document] =
     draw(
-      drawField(Document.typ)(ctx => input(ctx, "text")),
-      drawField(Document.number)(ctx => input(ctx, "text"))
+      drawField(Document.typ)(ctx => textInput(ctx)),
+      drawField(Document.number)(ctx => textInput(ctx))
     )
 
   val regForm: FormRenderer[Reg] =
     draw(
-      drawField(Reg.login)(ctx => input(ctx, "text")),
-      drawField(Reg.age)(ctx => input(ctx, "number")),
+      drawField(Reg.login)(ctx => textInput(ctx)),
+      drawField(Reg.age)(ctx => numberInput(ctx)),
       subForm(Reg.address, "Address")(addressForm),
       repeated(Reg.docs, "Docs")(documentForm)
     )
@@ -63,7 +68,7 @@ object DecodeValidateRenderTests extends TestSuite:
   val tests = Tests {
 
     test("renders every field with lens-derived names") {
-      val html = Elem.render(renderForm(regForm, None))
+      val html = renderForm(regForm, None).render
       assert(html.contains("name=\"login\""))
       assert(html.contains("name=\"age\""))
       assert(html.contains("name=\"address.city\""))
@@ -202,18 +207,17 @@ object DecodeValidateRenderTests extends TestSuite:
     test("conditional rendering via ambient env") {
       val viewOnly: FormRenderer[Reg] =
         draw(
-          drawField(Reg.login)(ctx => input(ctx, "text")),
-          drawField(Reg.age)(ctx => input(ctx, "number"))
+          drawField(Reg.login)(ctx => textInput(ctx)),
+          drawField(Reg.age)(ctx => numberInput(ctx))
             .showIf(_.env.mode == RenderEnv.Mode.Edit),
           subForm(Reg.address, "Address")(addressForm),
           repeated(Reg.docs, "Docs")(documentForm)
         )
 
-      val editHtml = Elem.render(renderForm(viewOnly, None))
+      val editHtml = renderForm(viewOnly, None).render
       assert(editHtml.contains("name=\"age\""))
 
-      val viewHtml =
-        Elem.render(renderForm(viewOnly, None, env = RenderEnv.view))
+      val viewHtml = renderForm(viewOnly, None, env = RenderEnv.view).render
       assert(!viewHtml.contains("name=\"age\""))
       assert(viewHtml.contains("name=\"login\""))
     }
