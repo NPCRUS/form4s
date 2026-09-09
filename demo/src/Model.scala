@@ -5,8 +5,6 @@ import zio.blocks.schema.Schema
 import zio.http.{Form, FormField}
 
 import java.util.UUID
-import AutoFields
-import {DecodingError, FormDecoder}
 
 enum Role:
   case Student, Developer, Designer, Manager, Other

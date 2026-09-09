@@ -131,7 +131,6 @@ object DemoApp extends ZIOAppDefault:
       req.body.asURLEncodedForm.map { fd =>
         decodeAndValidate[Registration](fd) match
           case Left(incomplete) =>
-            println(incomplete)
             renderPage(incomplete.oldForm, incomplete.errors)
           case Right(reg) => renderSuccess(reg)
       }
