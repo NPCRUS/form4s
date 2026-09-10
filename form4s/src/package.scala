@@ -38,7 +38,7 @@
   *
   * given FormDecoder[Registration] = FormDecoder.derived
   *
-  * given Validation[Registration] = Validation(
+  * given Validation[Registration, Any] = Validation(
   *   rule(Registration.username, Validator.nonEmpty),
   *   rule(Registration.age, (Validator.min(1) ++ Validator.max(150)).option)
   * )

@@ -13,6 +13,20 @@ case class Org(name: String, age: Option[Int], shops: Seq[Shop])
 object Org extends AutoFields[Org]:
   given Schema[Org] = Schema.derived
 
+case class EmailForm(email: String)
+object EmailForm extends AutoFields[EmailForm]:
+  given Schema[EmailForm] = Schema.derived
+
+trait EmailBlocklist:
+  def contains(email: String): UIO[Boolean]
+
+object EmailBlocklist:
+  val live: ULayer[EmailBlocklist] =
+    ZLayer.succeed(new EmailBlocklist {
+      def contains(email: String): UIO[Boolean] =
+        ZIO.succeed(email == "x@spam.com")
+    })
+
 object ValidationZIOTests extends TestSuite:
 
   def run[E, A](z: ZIO[Any, E, A]): Either[E, A] =
@@ -22,16 +36,22 @@ object ValidationZIOTests extends TestSuite:
 
   given FormDecoder[Org] = FormDecoder.derived
   given FormDecoder[Shop] = FormDecoder.derived
+  given FormDecoder[EmailForm] = FormDecoder.derived
 
-  val effectfulNonEmpty: ValidatorZIO[String] = in =>
+  val effectfulNonEmpty: ValidatorZIO[String, Any] = in =>
     ZIO.succeed(if in.isEmpty then Seq("Empty!") else Seq.empty)
 
-  val effectfulShopsNonEmpty: ValidatorZIO[Org] = o =>
+  val effectfulShopsNonEmpty: ValidatorZIO[Org, Any] = o =>
     ZIO.succeed(
       if o.shops.isEmpty then Seq("Need at least one shop") else Seq.empty
     )
 
-  given Validation[Org] = Validation(rule(Org.name, effectfulNonEmpty))
+  val notBlocklisted: ValidatorZIO[String, EmailBlocklist] = in =>
+    ZIO
+      .serviceWithZIO[EmailBlocklist](_.contains(in))
+      .map(if _ then Seq("Email is blocklisted") else Seq.empty)
+
+  given Validation[Org, Any] = Validation(rule(Org.name, effectfulNonEmpty))
 
   val tests = Tests {
 
@@ -131,5 +151,37 @@ object ValidationZIOTests extends TestSuite:
       val incomplete = result.swap.toOption.get
       assert(incomplete.errors("name") == Seq("Обязательное поле"))
       assert(incomplete.oldForm.isEmpty)
+    }
+
+    test("validator captures a ZIO environment service") {
+      val v = Validation(
+        rule(EmailForm.email, Validator.isEmail), // pure, auto-widens
+        rule(EmailForm.email, notBlocklisted) // requires EmailBlocklist
+      )
+
+      val ok =
+        run(v.run(EmailForm("a@b.c")).provideLayer(EmailBlocklist.live))
+      assert(ok.toOption.get.isEmpty)
+
+      val bad =
+        run(v.run(EmailForm("x@spam.com")).provideLayer(EmailBlocklist.live))
+      assert(bad.toOption.get("email") == Seq("Email is blocklisted"))
+    }
+
+    test("decodeAndValidate threads the ZIO environment") {
+      given Validation[EmailForm, EmailBlocklist] = Validation(
+        rule(EmailForm.email, notBlocklisted)
+      )
+
+      val form = Form(FormField.Simple("email", "x@spam.com"))
+      val result =
+        run(
+          decodeAndValidate[EmailForm](form).provideLayer(
+            EmailBlocklist.live
+          )
+        )
+      assert(result.isLeft)
+      val incomplete = result.swap.toOption.get
+      assert(incomplete.errors("email") == Seq("Email is blocklisted"))
     }
   }

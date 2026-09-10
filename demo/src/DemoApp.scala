@@ -9,7 +9,7 @@ object DemoApp extends ZIOAppDefault:
 
   given FormDecoder[Registration] = FormDecoder.derived
 
-  given Validation[Registration] = Validation(
+  given Validation[Registration, Any] = Validation(
     rule(Registration.username, Validator.nonEmpty ++ Validator.minLength(3)),
     rule(Registration.email, Validator.isEmail),
     rule(

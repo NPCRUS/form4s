@@ -38,11 +38,11 @@ object DecodeAndValidateTests extends TestSuite:
   given FormDecoder[OptForm] = FormDecoder.derived
   given FormDecoder[OptOnly] = FormDecoder.derived
 
-  given Validation[Account] = Validation(
+  given Validation[Account, Any] = Validation(
     rule(Account.login, Validator.nonEmpty)
   )
 
-  given Validation[Signup] = Validation(
+  given Validation[Signup, Any] = Validation(
     rule(Signup.login, Validator.nonEmpty),
     rule(Signup.address / Addr.city, Validator.nonEmpty),
     rule(Signup.address / Addr.street, Validator.nonEmpty),
@@ -242,7 +242,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("custom SubForm validator error appears at subform path") {
-      given Validation[Signup] = Validation(
+      given Validation[Signup, Any] = Validation(
         rule(Signup.login, Validator.nonEmpty),
         rule(Signup.address / Addr.city, Validator.nonEmpty),
         rule(Signup.address / Addr.street, Validator.nonEmpty),
@@ -273,7 +273,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("repeated required rule, empty list fails validation") {
-      given Validation[Signup] = Validation(
+      given Validation[Signup, Any] = Validation(
         rule(Signup.login, Validator.nonEmpty),
         rule(Signup.address / Addr.city, Validator.nonEmpty),
         rule(Signup.address / Addr.street, Validator.nonEmpty),
@@ -294,7 +294,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("repeated required rule, non-empty list passes validation") {
-      given Validation[Signup] = Validation(
+      given Validation[Signup, Any] = Validation(
         rule(Signup.login, Validator.nonEmpty),
         rule(Signup.address / Addr.city, Validator.nonEmpty),
         rule(Signup.address / Addr.street, Validator.nonEmpty),
@@ -313,7 +313,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("custom repeated validator error appears at section path") {
-      given Validation[Signup] = Validation(
+      given Validation[Signup, Any] = Validation(
         rule(Signup.login, Validator.nonEmpty),
         rule(Signup.address / Addr.city, Validator.nonEmpty),
         rule(Signup.address / Addr.street, Validator.nonEmpty),
@@ -342,7 +342,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("custom repeated validator composes with required") {
-      given Validation[Signup] = Validation(
+      given Validation[Signup, Any] = Validation(
         rule(Signup.login, Validator.nonEmpty),
         rule(Signup.address / Addr.city, Validator.nonEmpty),
         rule(Signup.address / Addr.street, Validator.nonEmpty),
@@ -366,7 +366,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("String field with no rule passes empty value") {
-      given Validation[Account] = Validation()
+      given Validation[Account, Any] = Validation()
 
       val form = Form(
         FormField.Simple("login", ""),
@@ -379,7 +379,7 @@ object DecodeAndValidateTests extends TestSuite:
     test(
       "Option[String] field absent from body decodes to None without error"
     ) {
-      given Validation[OptForm] = Validation(
+      given Validation[OptForm, Any] = Validation(
         rule(OptForm.name, Validator.nonEmpty)
       )
 
@@ -390,7 +390,7 @@ object DecodeAndValidateTests extends TestSuite:
     }
 
     test("Option[String] field with required rule fails on None") {
-      given Validation[OptOnly] = Validation(
+      given Validation[OptOnly, Any] = Validation(
         rule(OptOnly.opt, Validator.required)
       )
 

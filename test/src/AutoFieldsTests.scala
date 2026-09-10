@@ -73,7 +73,7 @@ object AutoFieldsTests extends TestSuite:
 
     test("validation uses auto-derived fields") {
       given FormDecoder[AutoReg] = FormDecoder.derived
-      given Validation[AutoReg] = Validation(
+      given Validation[AutoReg, Any] = Validation(
         rule(AutoReg.username, Validator.nonEmpty),
         rule(AutoReg.email, Validator.isEmail),
         rule(AutoReg.address / AutoAddress.city, Validator.nonEmpty)

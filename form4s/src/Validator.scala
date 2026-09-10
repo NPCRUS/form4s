@@ -29,8 +29,10 @@ trait Validator[A]:
   /** Lift to [[Option]]: only checks the value when it is `Some`. */
   def option: Validator[Option[A]] = opt => opt.fold(Seq.empty)(validate)
 
-  /** Lift this pure validator into an effectful [[ValidatorZIO]]. */
-  def toZIO: ValidatorZIO[A] = ValidatorZIO.fromPure(this)
+  /** Lift this pure validator into an effectful [[ValidatorZIO]] (requiring no
+    * environment).
+    */
+  def toZIO: ValidatorZIO[A, Any] = ValidatorZIO.fromPure(this)
 
 object Validator:
 
@@ -102,9 +104,12 @@ object Validator:
 
 /** A validation rule: run over the whole model, producing an effect that
   * resolves to a map of error path → messages.
+  *
+  * `R` is contravariant, so a pure rule (`R = Any`) auto-widens into any
+  * environment.
   */
-final case class Rule[S](
-    validate: S => ZIO[Any, Nothing, Map[String, Seq[String]]]
+final case class Rule[S, -R](
+    validate: S => ZIO[R, Nothing, Map[String, Seq[String]]]
 )
 
 /** A field-level rule: validate the value focused by `field`, keyed by the
@@ -112,38 +117,38 @@ final case class Rule[S](
   *
   * Accepts a pure [[Validator]] (auto-lifts) or an effectful [[ValidatorZIO]].
   */
-def rule[S, A](field: Field[S, A], v: ValidatorZIO[A]): Rule[S] =
+def rule[S, A, R](field: Field[S, A], v: ValidatorZIO[A, R]): Rule[S, R] =
   Rule(s =>
     v.validate(field.get(s)).map { errs =>
       if errs.nonEmpty then Map(field.name -> errs) else Map.empty
     }
   )
 
-def rule[S, A](field: Field[S, A], v: Validator[A]): Rule[S] =
+def rule[S, A](field: Field[S, A], v: Validator[A]): Rule[S, Any] =
   rule(field, v.toZIO)
 
 /** A whole-model rule (e.g. cross-field consistency), keyed at `path` (default:
   * the root form). The pure [[Validator]] overload auto-lifts to
   * [[ValidatorZIO]].
   */
-def whole[S](v: ValidatorZIO[S], path: String): Rule[S] =
+def whole[S, R](v: ValidatorZIO[S, R], path: String): Rule[S, R] =
   Rule(s =>
     v.validate(s).map { errs =>
       if errs.nonEmpty then Map(path -> errs) else Map.empty
     }
   )
 
-def whole[S](v: Validator[S], path: String = ""): Rule[S] =
+def whole[S](v: Validator[S], path: String = ""): Rule[S, Any] =
   whole(v.toZIO, path)
 
 /** A repeated-subform rule: validate every element of a `Seq` field with a
   * sub-[[Validation]], prefixing error keys with `field.INDEX.` (e.g.
   * `docs.0.number`).
   */
-def ruleEach[S, A](
+def ruleEach[S, A, R](
     field: Field[S, Seq[A]],
-    validation: Validation[A]
-): Rule[S] =
+    validation: Validation[A, R]
+): Rule[S, R] =
   Rule(s =>
     ZIO
       .collectAllPar(
@@ -170,7 +175,7 @@ def ruleEach[S, A](
   * object Item extends AutoFields[Item]:
   *   given Schema[Item] = Schema.derived
   *
-  * val v: Validation[Order] = Validation(
+  * val v: Validation[Order, Any] = Validation(
   *   rule(Order.email, Validator.isEmail),                 // pure, auto-lifts
   *   whole(Validator.custom[Order]("need items")(_.items.nonEmpty), "items"),
   *   ruleEach(Order.items, Validation(rule(Item.sku, Validator.nonEmpty)))
@@ -180,17 +185,19 @@ def ruleEach[S, A](
   * @see
   *   [[decodeAndValidate]] runs this over a decoded form.
   */
-final case class Validation[S](rules: List[Rule[S]]):
-  def ++(that: Validation[S]): Validation[S] =
+final case class Validation[S, -R](rules: List[Rule[S, R]]):
+  def ++[R1 <: R](that: Validation[S, R1]): Validation[S, R1] =
     Validation(rules ++ that.rules)
 
-  def run(s: S): ZIO[Any, Nothing, Map[String, Seq[String]]] =
+  def run(s: S): ZIO[R, Nothing, Map[String, Seq[String]]] =
     ZIO
       .collectAllPar(rules.map(_.validate(s)))
       .map(_.foldLeft(Map.empty[String, Seq[String]])(mergeErrors))
 
 object Validation:
-  def apply[S](rules: Rule[S]*): Validation[S] = Validation(rules.toList)
+  def apply[S, R](rules: Rule[S, R]*): Validation[S, R] = Validation(
+    rules.toList
+  )
 
 private def mergeErrors(
     acc: Map[String, Seq[String]],

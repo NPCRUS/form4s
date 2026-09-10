@@ -24,7 +24,7 @@ object E2ETests extends TestSuite:
 
   given FormDecoder[TestUser] = FormDecoder.derived
 
-  given Validation[TestUser] = Validation(
+  given Validation[TestUser, Any] = Validation(
     rule(TestUser.username, Validator.nonEmpty)
   )
 

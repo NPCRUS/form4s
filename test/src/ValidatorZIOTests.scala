@@ -34,7 +34,7 @@ object ValidatorZIOTests extends TestSuite {
     }
 
     test("a custom effectful validator that keeps saying нет") {
-      val areWeThereYet: ValidatorZIO[String] = in =>
+      val areWeThereYet: ValidatorZIO[String, Any] = in =>
         ZIO.succeed(if (in == "are we there yet") Seq("Нет") else Seq.empty)
       assert(run(areWeThereYet.validate("are we there yet")) == Seq("Нет"))
       assert(run(areWeThereYet.validate("5 more minutes")).isEmpty)
