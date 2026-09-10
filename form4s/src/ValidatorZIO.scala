@@ -14,9 +14,15 @@ import zio.*
 trait ValidatorZIO[T]:
   def validate(in: T): ZIO[Any, Nothing, Seq[String]]
 
+  def ++(that: ValidatorZIO[T]): ValidatorZIO[T] =
+    ValidatorZIO.compose(this, that)
+
   def contramap[U](f: U => T): ValidatorZIO[U] = in => validate(f(in))
 
   def map(f: T => T): ValidatorZIO[T] = in => validate(f(in))
+
+  def option: ValidatorZIO[Option[T]] =
+    in => in.fold(ZIO.succeed(Seq.empty))(validate)
 
 object ValidatorZIO:
 

@@ -14,9 +14,7 @@ object DemoApp extends ZIOAppDefault:
     rule(Registration.email, Validator.isEmail),
     rule(
       Registration.age,
-      Validator.custom[Option[Int]]("Возраст должен быть от 1 до 150")(
-        _.forall(a => a >= 1 && a <= 150)
-      )
+      (Validator.min(1) ++ Validator.max(150)).option
     ),
     rule(
       Registration.score,
@@ -128,11 +126,11 @@ object DemoApp extends ZIOAppDefault:
       renderPage(None, Map.empty)
     },
     Method.POST / "" -> handler { (req: Request) =>
-      req.body.asURLEncodedForm.map { fd =>
-        decodeAndValidate[Registration](fd) match
-          case Left(incomplete) =>
-            renderPage(incomplete.oldForm, incomplete.errors)
-          case Right(reg) => renderSuccess(reg)
+      req.body.asURLEncodedForm.flatMap { fd =>
+        decodeAndValidate[Registration](fd).fold(
+          incomplete => renderPage(incomplete.oldForm, incomplete.errors),
+          renderSuccess
+        )
       }
     }
   )

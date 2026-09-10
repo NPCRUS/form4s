@@ -71,9 +71,9 @@ object E2ETests extends TestSuite:
       )
     },
     Method.POST / "" -> handler { (req: Request) =>
-      req.body.asURLEncodedForm.map { formData =>
-        decodeAndValidate[TestUser](formData) match
-          case Left(incomplete) =>
+      req.body.asURLEncodedForm.flatMap { formData =>
+        decodeAndValidate[TestUser](formData).fold(
+          incomplete => {
             lastDecodeResult.set(Left(incomplete.errors))
             val errorDivs =
               incomplete.errors.toSeq.flatMap { case (field, msgs) =>
@@ -96,7 +96,8 @@ object E2ETests extends TestSuite:
                 )
               )
             )
-          case Right(user) =>
+          },
+          user => {
             lastDecodeResult.set(Right(user))
             Response.html(
               html(
@@ -111,6 +112,8 @@ object E2ETests extends TestSuite:
                 )
               )
             )
+          }
+        )
       }
     }
   )

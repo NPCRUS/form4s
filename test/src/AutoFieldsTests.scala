@@ -1,6 +1,7 @@
 package form4s
 
 import utest.*
+import zio.*
 import zio.blocks.schema.Schema
 import zio.http.{Form, FormField}
 import zio.http.template2.*
@@ -27,6 +28,11 @@ object AutoFieldsTests extends TestSuite:
       drawField(AutoAddress.city)(ctx => List[Dom](input(name := ctx.path))),
       drawField(AutoAddress.street)(ctx => List[Dom](input(name := ctx.path)))
     )(_ ++ _)
+
+  def run[E, A](z: ZIO[Any, E, A]): Either[E, A] =
+    Unsafe.unsafe { implicit u =>
+      Runtime.default.unsafe.run(z.either)(using Trace.empty, u).getOrThrow()
+    }
 
   val tests = Tests {
 
@@ -79,7 +85,7 @@ object AutoFieldsTests extends TestSuite:
         FormField.Simple("address.city", ""),
         FormField.Simple("address.street", "Main St")
       )
-      val result = decodeAndValidate[AutoReg](form)
+      val result = run(decodeAndValidate[AutoReg](form))
       val incomplete = result.swap.toOption.get
       assert(incomplete.errors("email") == Seq("Некорректный email"))
       assert(

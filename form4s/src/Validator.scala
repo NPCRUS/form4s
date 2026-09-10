@@ -1,5 +1,7 @@
 package form4s
 
+import zio.*
+
 /** Pure composable validator. Returns a (possibly empty) sequence of error
   * messages; empty means valid.
   */
@@ -75,30 +77,38 @@ object Validator:
     if """^https?://[^\s]+""".r.matches(in) then Seq.empty
     else Seq("Некорректный URL")
 
-/** A validation rule: run over the whole model, producing a map of error path →
-  * messages.
+/** A validation rule: run over the whole model, producing an effect that
+  * resolves to a map of error path → messages.
   */
-final case class Rule[S](validate: S => Map[String, Seq[String]])
+final case class Rule[S](
+    validate: S => ZIO[Any, Nothing, Map[String, Seq[String]]]
+)
 
 /** A field-level rule: validate the value focused by `field`, keyed by the
   * field's name (derived from the lens).
   */
-def rule[S, A](field: Field[S, A], v: Validator[A]): Rule[S] =
+def rule[S, A](field: Field[S, A], v: ValidatorZIO[A]): Rule[S] =
   Rule(s =>
-    v.validate(field.get(s)) match
-      case errs if errs.nonEmpty => Map(field.name -> errs)
-      case _                     => Map.empty
+    v.validate(field.get(s)).map { errs =>
+      if errs.nonEmpty then Map(field.name -> errs) else Map.empty
+    }
   )
+
+def rule[S, A](field: Field[S, A], v: Validator[A]): Rule[S] =
+  rule(field, v.toZIO)
 
 /** A whole-model rule (e.g. cross-field consistency), optionally keyed at a
   * `path` (default: the root form).
   */
-def whole[S](v: Validator[S], path: String = ""): Rule[S] =
+def whole[S](v: ValidatorZIO[S], path: String): Rule[S] =
   Rule(s =>
-    v.validate(s) match
-      case errs if errs.nonEmpty => Map(path -> errs)
-      case _                     => Map.empty
+    v.validate(s).map { errs =>
+      if errs.nonEmpty then Map(path -> errs) else Map.empty
+    }
   )
+
+def whole[S](v: Validator[S], path: String = ""): Rule[S] =
+  whole(v.toZIO, path)
 
 /** A repeated-subform rule: validate every element of a `Seq` field with a
   * sub-[[Validation]], prefixing error keys with `field.INDEX.`.
@@ -108,15 +118,15 @@ def ruleEach[S, A](
     validation: Validation[A]
 ): Rule[S] =
   Rule(s =>
-    field
-      .get(s)
-      .zipWithIndex
-      .flatMap { (a, i) =>
-        validation.run(a).map { case (k, errs) =>
-          (s"${field.name}.$i.$k", errs)
+    ZIO
+      .collectAllPar(
+        field.get(s).zipWithIndex.map { (a, i) =>
+          validation.run(a).map { m =>
+            m.map { case (k, errs) => (s"${field.name}.$i.$k", errs) }
+          }
         }
-      }
-      .toMap
+      )
+      .map(_.foldLeft(Map.empty[String, Seq[String]])(mergeErrors))
   )
 
 /** A set of rules, run over a model to produce a path → errors map. */
@@ -124,12 +134,18 @@ final case class Validation[S](rules: List[Rule[S]]):
   def ++(that: Validation[S]): Validation[S] =
     Validation(rules ++ that.rules)
 
-  def run(s: S): Map[String, Seq[String]] =
-    rules.foldLeft(Map.empty[String, Seq[String]]) { (acc, r) =>
-      r.validate(s).foldLeft(acc) { case (a, (k, errs)) =>
-        a.updated(k, a.getOrElse(k, Seq.empty) ++ errs)
-      }
-    }
+  def run(s: S): ZIO[Any, Nothing, Map[String, Seq[String]]] =
+    ZIO
+      .collectAllPar(rules.map(_.validate(s)))
+      .map(_.foldLeft(Map.empty[String, Seq[String]])(mergeErrors))
 
 object Validation:
   def apply[S](rules: Rule[S]*): Validation[S] = Validation(rules.toList)
+
+private def mergeErrors(
+    acc: Map[String, Seq[String]],
+    m: Map[String, Seq[String]]
+): Map[String, Seq[String]] =
+  m.foldLeft(acc) { case (a, (k, errs)) =>
+    a.updated(k, a.getOrElse(k, Seq.empty) ++ errs)
+  }

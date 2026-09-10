@@ -1,6 +1,7 @@
 package form4s
 
 import utest.*
+import zio.*
 import zio.blocks.schema.Schema
 import zio.http.{Form, FormField}
 
@@ -54,6 +55,11 @@ object DecodeAndValidateTests extends TestSuite:
     )
   )
 
+  def run[E, A](z: ZIO[Any, E, A]): Either[E, A] =
+    Unsafe.unsafe { implicit u =>
+      Runtime.default.unsafe.run(z.either)(using Trace.empty, u).getOrThrow()
+    }
+
   val tests = Tests {
 
     test("valid input succeeds with decoded value") {
@@ -61,7 +67,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("login", "alice"),
         FormField.Simple("age", "30")
       )
-      val result = decodeAndValidate[Account](form)
+      val result = run(decodeAndValidate[Account](form))
       assert(result.isRight)
       val user = result.toOption.get
       assert(user.login == "alice")
@@ -73,7 +79,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("login", ""),
         FormField.Simple("age", "30")
       )
-      val result = decodeAndValidate[Account](form)
+      val result = run(decodeAndValidate[Account](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(incomplete.errors("login") == Seq("Поле должно быть заполнено"))
@@ -88,7 +94,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("login", "alice"),
         FormField.Simple("age", "abc")
       )
-      val result = decodeAndValidate[Account](form)
+      val result = run(decodeAndValidate[Account](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(
@@ -103,7 +109,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.city", "NYC"),
         FormField.Simple("address.street", "Main St")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isRight)
       val reg = result.toOption.get
       assert(reg.login == "alice")
@@ -118,7 +124,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.city", ""),
         FormField.Simple("address.street", "Main St")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(
@@ -134,7 +140,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.city", ""),
         FormField.Simple("address.street", "Main St")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       val incomplete = result.swap.toOption.get
       assert(incomplete.oldForm.isDefined)
       val old = incomplete.oldForm.get
@@ -153,7 +159,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("docs.1.typ", "visa"),
         FormField.Simple("docs.1.number", "67890")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isRight)
       val reg = result.toOption.get
       assert(reg.login == "alice")
@@ -174,7 +180,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("docs.1.typ", "visa"),
         FormField.Simple("docs.1.number", "67890")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(
@@ -195,7 +201,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("docs.1.typ", "visa"),
         FormField.Simple("docs.1.number", "67890")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       val incomplete = result.swap.toOption.get
       assert(incomplete.oldForm.isDefined)
       val old = incomplete.oldForm.get
@@ -212,7 +218,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("login", "alice"),
         FormField.Simple("address.city", "NYC")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(
@@ -228,7 +234,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.street", "Main St"),
         FormField.Simple("docs.0.number", "12345")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(incomplete.errors("docs.0.typ") == Seq("Обязательное поле"))
@@ -253,7 +259,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.city", "NYC"),
         FormField.Simple("address.street", "NYC")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(
@@ -279,7 +285,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.city", "NYC"),
         FormField.Simple("address.street", "Main St")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(
@@ -302,7 +308,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("docs.0.typ", "passport"),
         FormField.Simple("docs.0.number", "12345")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isRight)
     }
 
@@ -328,7 +334,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("docs.2.typ", "id"),
         FormField.Simple("docs.2.number", "3")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(incomplete.errors("docs") == Seq("Maximum 2 documents"))
@@ -352,7 +358,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("address.city", "NYC"),
         FormField.Simple("address.street", "Main St")
       )
-      val result = decodeAndValidate[Signup](form)
+      val result = run(decodeAndValidate[Signup](form))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       val errs = incomplete.errors("docs")
@@ -366,7 +372,7 @@ object DecodeAndValidateTests extends TestSuite:
         FormField.Simple("login", ""),
         FormField.Simple("age", "30")
       )
-      val result = decodeAndValidate[Account](form)
+      val result = run(decodeAndValidate[Account](form))
       assert(result.isRight)
     }
 
@@ -378,7 +384,7 @@ object DecodeAndValidateTests extends TestSuite:
       )
 
       val form = Form(FormField.Simple("name", "alice"))
-      val result = decodeAndValidate[OptForm](form)
+      val result = run(decodeAndValidate[OptForm](form))
       assert(result.isRight)
       assert(result.toOption.get.opt == None)
     }
@@ -388,7 +394,7 @@ object DecodeAndValidateTests extends TestSuite:
         rule(OptOnly.opt, Validator.required)
       )
 
-      val result = decodeAndValidate[OptOnly](Form.empty)
+      val result = run(decodeAndValidate[OptOnly](Form.empty))
       assert(result.isLeft)
       val incomplete = result.swap.toOption.get
       assert(incomplete.errors("opt") == Seq("Обязательное поле"))
