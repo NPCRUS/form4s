@@ -24,11 +24,14 @@ final class FieldsHolder(members: Map[String, Any])
   * object Registration extends AutoFields[Registration]:
   *   given Schema[Registration] = Schema.derived
   *
-  * val u = Registration.username  // LeafField[Registration, String, "username"]
+  * val u = Registration.username // LeafField[Registration, String, "username"]
   * }}}
   *
   * A user-defined member on the companion (e.g. a manual `field(_.x)`) always
   * takes precedence over the derived one.
+  *
+  * @see
+  *   [[FormFields]] for the explicit `field(_.x)` alternative.
   */
 trait AutoFields[S] extends FormFields[S]:
   given toFields(using
@@ -37,7 +40,8 @@ trait AutoFields[S] extends FormFields[S]:
     _ => fieldsFor.fields
 
 /** Typeclass whose `Out` is the refined structural type carrying one
-  * `LeafField[S, A, N]` member per field of `S`.
+  * `LeafField[S, A, N]` member per field of `S`. Usually summoned automatically
+  * by the `AutoFields` conversion rather than used directly.
   */
 trait FieldsFor[S]:
   type Out

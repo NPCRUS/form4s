@@ -4,6 +4,13 @@ import zio.*
 
 /** Pure composable validator. Returns a (possibly empty) sequence of error
   * messages; empty means valid.
+  *
+  * This is the leaf-level building block for [[Validation]] rules; it is
+  * effect-free. Lift it to [[ValidatorZIO]] with [[toZIO]] (which the
+  * [[rule]]/[[whole]] combinators do automatically).
+  *
+  * @tparam A
+  *   the type of value being validated
   */
 trait Validator[A]:
   def validate(a: A): Seq[String]
@@ -11,6 +18,7 @@ trait Validator[A]:
   /** Concatenate with another validator for the same input type. */
   def ++(that: Validator[A]): Validator[A] = Validator.compose(this, that)
 
+  /** Adapt this validator to a different input type by applying `f` first. */
   def contramap[B](f: B => A): Validator[B] = b => validate(f(b))
 
   /** Transform the input before validation (identity by default; useful for
@@ -18,8 +26,7 @@ trait Validator[A]:
     */
   def map(f: A => A): Validator[A] = a => validate(f(a))
 
-  /** Create a validator for [[Option]] that only checks the value when present.
-    */
+  /** Lift to [[Option]]: only checks the value when it is `Some`. */
   def option: Validator[Option[A]] = opt => opt.fold(Seq.empty)(validate)
 
   /** Lift this pure validator into an effectful [[ValidatorZIO]]. */
@@ -27,52 +34,68 @@ trait Validator[A]:
 
 object Validator:
 
+  /** Combine validators, concatenating all their error messages. */
   def compose[A](vs: Validator[A]*): Validator[A] =
     a => vs.flatMap(_.validate(a))
 
+  /** A validator that always passes. */
   def empty[A]: Validator[A] = _ => Seq.empty
 
+  /** Create a validator that fails with `message` when `predicate` is false. */
   def custom[A](message: String)(predicate: A => Boolean): Validator[A] =
     a => if predicate(a) then Seq.empty else Seq(message)
 
+  /** Fails on an empty string. */
   val nonEmpty: Validator[String] = in =>
     if in.isEmpty then Seq("Поле должно быть заполнено") else Seq.empty
 
+  /** Fails on an empty sequence. */
   def nonEmptySeq[A]: Validator[Seq[A]] = in =>
     if in.isEmpty then Seq("Добавьте минимум одно значение") else Seq.empty
 
+  /** Fails when the [[Option]] is `None`. */
   def required[A]: Validator[Option[A]] = in =>
     if in.isEmpty then Seq("Обязательное поле") else Seq.empty
 
+  /** Fails when the string has fewer than `n` characters. */
   def minLength(n: Int): Validator[String] = in =>
     if in.length < n then Seq(s"Минимум $n символов") else Seq.empty
 
+  /** Fails when the string has more than `n` characters. */
   def maxLength(n: Int): Validator[String] = in =>
     if in.length > n then Seq(s"Максимум $n символов") else Seq.empty
 
+  /** Fails when the string does not look like an email address. */
   val isEmail: Validator[String] = in =>
     if """^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$""".r.matches(in) then Seq.empty
     else Seq("Некорректный email")
 
+  /** Fails when the string is not a `+`-prefixed phone number. */
   val isPhone: Validator[String] = in =>
     if """^\+\d{10,15}$""".r.matches(in) then Seq.empty
     else Seq("Некорректный номер телефона")
 
+  /** Fails when the string does not fully match `regex`. */
   def matches(regex: scala.util.matching.Regex): Validator[String] = in =>
     if regex.matches(in) then Seq.empty else Seq("Неверный формат")
 
+  /** Fails when the integer is less than `n`. */
   def min(n: Int): Validator[Int] = in =>
     if in < n then Seq(s"Минимум $n") else Seq.empty
 
+  /** Fails when the integer is greater than `n`. */
   def max(n: Int): Validator[Int] = in =>
     if in > n then Seq(s"Максимум $n") else Seq.empty
 
+  /** Fails when the boolean is `false` (e.g. unchecked checkbox). */
   val requiredTrue: Validator[Boolean] = in =>
     if in then Seq.empty else Seq("Требуется подтверждение")
 
+  /** Fails when the integer is not strictly positive. */
   val positive: Validator[Int] = in =>
     if in > 0 then Seq.empty else Seq("Значение должно быть положительным")
 
+  /** Fails when the string is not an `http(s)` URL. */
   val isUrl: Validator[String] = in =>
     if """^https?://[^\s]+""".r.matches(in) then Seq.empty
     else Seq("Некорректный URL")
@@ -86,6 +109,8 @@ final case class Rule[S](
 
 /** A field-level rule: validate the value focused by `field`, keyed by the
   * field's name (derived from the lens).
+  *
+  * Accepts a pure [[Validator]] (auto-lifts) or an effectful [[ValidatorZIO]].
   */
 def rule[S, A](field: Field[S, A], v: ValidatorZIO[A]): Rule[S] =
   Rule(s =>
@@ -97,8 +122,9 @@ def rule[S, A](field: Field[S, A], v: ValidatorZIO[A]): Rule[S] =
 def rule[S, A](field: Field[S, A], v: Validator[A]): Rule[S] =
   rule(field, v.toZIO)
 
-/** A whole-model rule (e.g. cross-field consistency), optionally keyed at a
-  * `path` (default: the root form).
+/** A whole-model rule (e.g. cross-field consistency), keyed at `path` (default:
+  * the root form). The pure [[Validator]] overload auto-lifts to
+  * [[ValidatorZIO]].
   */
 def whole[S](v: ValidatorZIO[S], path: String): Rule[S] =
   Rule(s =>
@@ -111,7 +137,8 @@ def whole[S](v: Validator[S], path: String = ""): Rule[S] =
   whole(v.toZIO, path)
 
 /** A repeated-subform rule: validate every element of a `Seq` field with a
-  * sub-[[Validation]], prefixing error keys with `field.INDEX.`.
+  * sub-[[Validation]], prefixing error keys with `field.INDEX.` (e.g.
+  * `docs.0.number`).
   */
 def ruleEach[S, A](
     field: Field[S, Seq[A]],
@@ -129,7 +156,30 @@ def ruleEach[S, A](
       .map(_.foldLeft(Map.empty[String, Seq[String]])(mergeErrors))
   )
 
-/** A set of rules, run over a model to produce a path → errors map. */
+/** A set of [[Rule]]s, run over a model to produce a path → errors map. Rules
+  * run concurrently and pure validators auto-lift to ZIO.
+  *
+  * {{{
+  * import zio.blocks.schema.Schema
+  *
+  * case class Order(email: String, items: Seq[Item])
+  * object Order extends AutoFields[Order]:
+  *   given Schema[Order] = Schema.derived
+  *
+  * case class Item(sku: String)
+  * object Item extends AutoFields[Item]:
+  *   given Schema[Item] = Schema.derived
+  *
+  * val v: Validation[Order] = Validation(
+  *   rule(Order.email, Validator.isEmail),                 // pure, auto-lifts
+  *   whole(Validator.custom[Order]("need items")(_.items.nonEmpty), "items"),
+  *   ruleEach(Order.items, Validation(rule(Item.sku, Validator.nonEmpty)))
+  * )
+  * }}}
+  *
+  * @see
+  *   [[decodeAndValidate]] runs this over a decoded form.
+  */
 final case class Validation[S](rules: List[Rule[S]]):
   def ++(that: Validation[S]): Validation[S] =
     Validation(rules ++ that.rules)

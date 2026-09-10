@@ -2,7 +2,7 @@
 
 ## Project
 
-form4s — a Scala 3 library for type-safe web form rendering, decoding, and validation. Library has no entry point; `demo` module contains a runnable zio-http demo app.
+form4s — a Scala 3 library for type-safe web form rendering, decoding, and validation, built on optics (zio-blocks-schema). Library has no entry point; `demo` module contains a runnable zio-http + Bootstrap 5 demo app.
 
 ## Build
 
@@ -22,40 +22,43 @@ form4s — a Scala 3 library for type-safe web form rendering, decoding, and val
 
 ## Dependencies
 
-- `magnolia` 1.3.21 — typeclass auto-derivation for case classes
-- `zio` 2.1.26 — effect system
-- `zio-http` 3.11.2 — HTTP form parsing
+- `zio-blocks-schema` 0.0.51 — `Schema` derivation + `Lens` optics (optics core)
+- `zio` 2.1.26 — effect system (effectful validation)
+- `zio-http` 3.11.2 — HTTP form parsing (`zio.http.Form`) + `template2` HTML DSL
 
 ## Source Layout
 
 ```
-form4s/src/          # package form4s
-  Form.scala         # Form[Elem] trait, FormSchema enum, FieldSchema, Renderable, draw/validate/decodeAndValidate, IncompleteForm
-  FormDecoder.scala  # FormDecoder typeclass with Magnolia auto-derivation, decodes zio-http Form
-  Validator.scala    # pure composable validators (error messages in Russian)
-  ValidatorZIO.scala # effectful validators used by FieldSchema
-  Cursor.scala       # dot-notation path builder for field names and error keys
-demo/src/            # package demo — DemoApp (zio-http server, port 8080), DemoHtmlForm
-test/src/            # package form4s — utest suites; HtmlForm implements Form[Dom] (zio-http template2)
+form4s/src/          # package form4s (the library)
+  package.scala      # package-level overview doc (entry-point map)
+  Field.scala        # Field / LeafField / Path / FormFields.field (optics)
+  FieldMacro.scala   # field(_.name) macro implementation
+  AutoFields.scala   # AutoFields / FieldsFor / FieldsHolder (auto-derived optics)
+  AutoFieldsMacro.scala # auto-derivation macro implementation
+  Decoder.scala      # FieldDecoder / FormDecoder (+ derived, Either, map)
+  Validator.scala    # Validator (pure) + rule/whole/ruleEach/Validation (effectful)
+  ValidatorZIO.scala # ValidatorZIO (effectful leaf validator)
+  Render.scala       # RenderContext / Drawn / FormRenderer / draw / drawField / renderForm
+  Totality.scala     # compile-time "all fields drawn" check (match types + macro)
+  Pipeline.scala     # Incomplete / decodeAndValidate
+demo/src/            # package demo — DemoApp (server, port 8080), Model, Views (Bootstrap 5)
+test/src/            # package form4s — utest suites + Playwright E2E
 ```
 
 ## Architecture
 
-- **`Form[Elem]`** — rendering algebra parameterized by element type (`base`, `amend`, `render`, subform containers `subFormContainer`/`listOfSubformsContainer`, `addBtn`/`deleteBtn`). Hosts path-dependent types: `Renderable[T]`, `FieldSchema[T]`, and `FormSchema[T]` enum with cases `Field`, `SubForm`, `RepeatedSubForm`. Provides `draw` (re-render with old values + errors), `validate`, and `decodeAndValidate`.
-- **HKT pattern** — user forms are `case class X[F[_]](...)`; raw data is `X[[T] =>> T]`, schema is `X[FormSchema]` (see `test/src/DecodeAndValidateTests.scala`).
-- **`decodeAndValidate`** — runs `FormDecoder.decode`, then `validate`; returns `ZIO[Any, IncompleteForm[T], T]`. `IncompleteForm(errors, oldForm)`: error keys are dot-notation paths; `oldForm` is `Some(decoded)` on validation failure, `None` on decode failure.
-- **`FormDecoder[T]`** — typeclass decoding `zio.http.Form` into `Either[Seq[DecodingError], T]`. Magnolia `AutoDerivation` for case classes; `split` supports parameterless enums by variant name (non-enum sealed traits error). Primitive decoders: String, Int, Long, Double, Float, BigDecimal, UUID, Boolean, LocalDateTime; containers: Option, Seq (comma-separated values, repeated fields with same key, indexed dot-notation incl. nested subforms), Either. `decodeFormData` decodes multipart bodies (with `octet-stream`-as-text workaround). Missing non-optional field → "Обязательное поле".
-- **`DecodingError(field, message)`** — structured decode error. Field paths propagate through nested subforms via `prependField`: dot-notation (`address.city`) and indexed (`docs.0.typ`); errors on missing entire subform point at the subform field itself (`address`).
-- **`Validator[T]`** — pure `validate(in: T): Seq[String]`; combinators `compose`, `empty`, `contramap`, `map`, `option`, `toZIO`; presets `nonEmpty`, `required`, `minLength`, `maxLength`, `isEmail`, `isPhone`, `matches`, `min`, `max`, `requiredTrue`, `positive`, `isUrl`, `custom`.
-- **`ValidatorZIO[T]`** — effectful `validate(in: T): ZIO[Any, Nothing, Seq[String]]`; `FieldSchema.validator` holds this type; pure validators lift via `toZIO`.
-- **`Cursor`** — accumulates path segments during `draw`/`validate`; `build` renders dot-notation strings matching form field names and error keys.
+- **Optics (the shared core)** — `Field[S, A]` (name + get), `LeafField[S, A, N]` (a lens tagged with the compile-time literal field name `N`), `Path[S, A]` (composed). Obtained via `field(_.name)` (a macro in `FormFields[S]`) or `AutoFields[S]` (a `given Conversion` using the companion-object trick to auto-derive every field from `Schema[S]`).
+- **Decoding** — `FieldDecoder[A]` decodes one raw string (leaf); `FormDecoder[A]` decodes a `zio.http.Form` into `Either[Seq[DecodingError], A]`. Case classes derive via `FormDecoder.derived` (Mirror, not Magnolia); supports Option/Seq/Either, dot-notation + indexed nesting. `isOptional` controls whether a missing field errors with "Обязательное поле".
+- **Validation** — `Validator[A]` (pure leaf, presets like `nonEmpty`/`isEmail`/`min`/`max`/`custom`) and `ValidatorZIO[A]` (effectful leaf). Rules `rule`/`whole`/`ruleEach` produce `Rule[S] = S => ZIO[Any, Nothing, Map[String, Seq[String]]]`, assembled into `Validation[S]` (concurrent via `collectAllPar`). Pure validators auto-lift via `Validator.toZIO`, so `rule(field, Validator.nonEmpty)` and `rule(field, someValidatorZIO)` both work. Error keys are dot-notation paths (`address.city`, `docs.0.typ`); `ruleEach` produces indexed keys.
+- **Rendering** — element-agnostic: `drawField(field)(render)` and `draw(fields...)(combine)` build a `FormRenderer[S, E]`; `E` is the caller's output type (e.g. `List[Dom]`), `combine` is the caller's fold (e.g. `_ ++ _`). `draw` runs `checkTotality` at compile time (Mirror + macro) so every field must be drawn exactly once. `RenderContext[A]` carries path/oldValue/errors.
+- **Pipeline** — `decodeAndValidate[A](form): ZIO[Any, Incomplete[A], A]` runs `FormDecoder.decode` then `Validation.run`; `Incomplete(errors, oldForm)` has `oldForm = Some` on validation failure, `None` on decode failure, for re-rendering via `renderForm`.
 
 ## Conventions
 
-- Scala 3 features: given instances, type lambdas, higher-kinded types, match expressions
+- Scala 3 features: given instances, `inline` macros, match types, higher-kinded types, `transparent inline`
 - scalafmt 3.10.7 with `runner.dialect = scala3`
-- ScalaDoc comments on all public API entities (types, methods, given instances)
-- Validator error messages are in Russian; FormDecoder messages are too ("Обязательное поле", "Невозможно преобразовать в число", etc.)
+- ScalaDoc on all public API entities; usage examples in `{{ }}` code blocks (written to be snippet-compiler checkable); cross-reference with `[[...]]`
+- Validator / FormDecoder error messages are in Russian ("Обязательное поле", "Невозможно преобразовать в число", etc.)
 - Test framework: utest 0.8.9 (`test` module, sources in `test/src/`)
 - E2E tests use Playwright 1.60.0 (headless Chromium) + zio-http server
 - Playwright browser install: `./mill test.runMain com.microsoft.playwright.CLI install chromium`

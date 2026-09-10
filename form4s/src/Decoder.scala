@@ -8,11 +8,23 @@ import java.util.UUID
 import scala.compiletime.{constValueTuple, erasedValue, summonInline}
 import scala.deriving.Mirror
 
-/** Structured decode error for a single field. */
+/** Structured decode error for a single field.
+  *
+  * @param field
+  *   dot-notation path, e.g. `"address.city"` or `"docs.0.typ"`.
+  * @param message
+  *   human-readable message (Russian for built-in decoders).
+  */
 final case class DecodingError(field: String, message: String)
 
-/** Simple typeclass decoding a single raw string into a value. Every leaf field
-  * requires one, and it is summoned implicitly.
+/** Typeclass decoding a single raw string into a value. Every leaf field
+  * requires one and it is summoned implicitly by [[FormDecoder]].
+  *
+  * Use [[FormDecoder]] for whole-`Form` (structural) decoding; this typeclass
+  * is the leaf-level building block.
+  *
+  * @tparam A
+  *   the decoded value type
   */
 trait FieldDecoder[A]:
   def decode(raw: String): Either[String, A]
@@ -74,9 +86,16 @@ object FieldDecoder:
 
 /** Structural typeclass decoding a `zio.http.Form` into a typed value. Derived
   * via `Mirror` for case classes; uses [[FieldDecoder]] for leaf fields.
+  *
+  * @tparam A
+  *   the decoded type
   */
 trait FormDecoder[A]:
   def decode(form: Form): Either[Seq[DecodingError], A]
+
+  /** Whether a missing field decodes to its empty value instead of producing a
+    * "required" error.
+    */
   def isOptional: Boolean = false
 
   /** Functor map: transform the decoded value. */
@@ -181,6 +200,7 @@ object FormDecoder:
 
       override def isOptional: Boolean = true
 
+  /** Left-biased decoder: try `A` first, fall back to `B`. */
   given eitherDecoder[A, B](using
       decA: FormDecoder[A],
       decB: FormDecoder[B]
@@ -188,7 +208,17 @@ object FormDecoder:
     def decode(form: Form): Either[Seq[DecodingError], Either[A, B]] =
       decA.decode(form).map(Left(_)).orElse(decB.decode(form).map(Right(_)))
 
-  /** Mirror-based auto-derivation for case classes. */
+  /** Mirror-based auto-derivation for case classes. Usually summoned
+    * automatically (or via `derives FormDecoder`):
+    *
+    * {{{
+    * case class User(name: String, age: Int)
+    * given FormDecoder[User] = FormDecoder.derived
+    *
+    * // decode a form:
+    * // FormDecoder.decode[User](form) : Either[Seq[DecodingError], User]
+    * }}}
+    */
   inline given derived[A <: Product](using
       m: Mirror.ProductOf[A]
   ): FormDecoder[A] =
